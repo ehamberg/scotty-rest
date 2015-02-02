@@ -20,14 +20,14 @@ import           Network.Wai (Application)
 import           Web.Scotty.Trans hiding (get, post, put, patch, delete, request)
 --import qualified Web.Scotty.Trans as ScottyTrans
 --import qualified Web.Scotty as Scotty
-import qualified Web.Scotty.Rest as ScottyRest
+import qualified Web.Scotty.Rest as Rest
 import           Web.Scotty.Rest (RestConfig(..), StdMethod(..))
 import qualified Test.QuickCheck as QC
 import Test.Hspec.Wai.Internal
 -- import Data.ByteString (pack)
 import Data.ByteString.Char8 (pack)
 
-instance QC.Arbitrary ScottyRest.StdMethod where
+instance QC.Arbitrary Rest.StdMethod where
   arbitrary = QC.elements (enumFromTo minBound maxBound)
 
 main :: IO ()
@@ -43,14 +43,14 @@ spec :: Spec
 spec = do
   describe "HTTP" $ do
     describe "503 Not available" $ do
-      withApp (ScottyRest.rest "/" ScottyRest.defaultConfig {serviceAvailable = return False}) $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $ do
         it "makes sure we get a 503 when serviceAvailable returns False" $ do
           get "/" `shouldRespondWith` 503
 
     describe "405 Method not allowed" $ do
       it "makes sure we get a 405 when method is not allowed" $ do
-        QC.property $ \(m :: ScottyRest.StdMethod) ms -> do
-          app <- scottyAppT id id (ScottyRest.rest "/" ScottyRest.defaultConfig {allowedMethods = return ms})
+        QC.property $ \(m :: Rest.StdMethod) ms -> do
+          app <- scottyAppT id id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
           let expected = if | m == OPTIONS && m `elem` ms -> 200
                             | m `elem` ms                 -> 406
                             | m `notElem` ms              -> 405
@@ -58,7 +58,7 @@ spec = do
           runWaiSession waiSession app
 
     describe "406 Not Acceptable" $ do
-      withApp (ScottyRest.rest "/" ScottyRest.defaultConfig {
+      withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "")]
       }) $ do
         it "makes sure we get a 406 when we don't provided the requested type" $ do
@@ -68,7 +68,7 @@ spec = do
             `shouldRespondWith` "" {matchStatus = 406}
 
     describe "Content negotiation" $ do
-      withApp (ScottyRest.rest "/" ScottyRest.defaultConfig {
+      withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "html"), ("application/json",json ("json" :: String))]
       }) $ do
         it "makes sure we get the appropriate content" $ do
