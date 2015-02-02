@@ -6,6 +6,7 @@ module Web.Scotty.Rest
 ( RestConfig(..)
 , RestException(..)
 , ProcessingResult(..)
+, Authorized(..)
 , Moved(..)
 , defaultConfig
 , rest
@@ -25,12 +26,14 @@ import Data.String (fromString)
 import Control.Monad.State
 
 type Url = TL.Text
+type Challenge = TL.Text
 
 data Moved = NotMoved | MovedTo Url
 data ResourceStatus = ResourceExists | ResourceDoesNotExist
 data ProcessingResult = ProcessingSucceeded
                       | ProcessingSucceededWithUrl Url
                       | ProcessingFailed
+data Authorized = Authorized | NotAuthorized Challenge
 
 rest :: (MonadIO m) => RoutePattern -> RestConfig (ScottyRestM m) -> ScottyT RestException m ()
 rest pattern handler = matchAny pattern (restHandlerStart handler `rescue` handleExcept)
@@ -42,7 +45,7 @@ data RestConfig m = RestConfig
   , contentTypesProvided :: m [(MediaType, m ())]
   , optionsHandler       :: m (Maybe (m ()))
   , charSetsProvided     :: m (Maybe [TL.Text])
-  , isAuthorized         :: m Bool
+  , isAuthorized         :: m Authorized
   , serviceAvailable     :: m Bool
   , movedPermanently     :: m Moved
   , movedTemporarily     :: m Moved
@@ -56,7 +59,7 @@ defaultConfig = RestConfig
   , contentTypesProvided = return []
   , optionsHandler       = return Nothing
   , charSetsProvided     = return Nothing
-  , isAuthorized         = return True
+  , isAuthorized         = return Authorized
   , serviceAvailable     = return True
   , movedPermanently     = return NotMoved
   , movedTemporarily     = return NotMoved
@@ -64,6 +67,7 @@ defaultConfig = RestConfig
 
 data RestException = MovedPermanently301
                    | MovedTemporarily307
+                   | Unauthorized401
                    | NotAcceptable406
                    | Gone410
                    | NotImplemented501
@@ -96,7 +100,12 @@ restHandlerStart config = do
     raise MethodNotAllowed405
 
   -- TODO: Is the request malformed?
-  -- TODO: Is the client authorized?
+
+  -- Is the client authorized?
+  isAuthorized config >>= \case
+       Authorized                -> return ()
+       (NotAuthorized challenge) -> setHeader "WWW-Authenticate" challenge >> raise Unauthorized401
+
   -- TODO: Is the client forbidden to access this resource?
   -- TODO: Are the content headers valid?
   -- TODO: Is the entity length valid?
@@ -165,6 +174,7 @@ handlePutPostPatch _exists config = do
 handleExcept :: (Monad m) => RestException -> ScottyRestM m ()
 handleExcept MovedPermanently301     = status movedPermanently301
 handleExcept MovedTemporarily307     = status temporaryRedirect307
+handleExcept Unauthorized401         = status unauthorized401
 handleExcept MethodNotAllowed405     = status methodNotAllowed405
 handleExcept NotAcceptable406        = status notAcceptable406
 handleExcept Gone410                 = status gone410

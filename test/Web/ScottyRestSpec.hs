@@ -57,6 +57,11 @@ spec = do
           let waiSession = request ((pack . show) m) "/" [] "" `shouldRespondWith` "" {matchStatus = expected}
           runWaiSession waiSession app
 
+    describe "401 Unauthorized" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {isAuthorized = return (Rest.NotAuthorized "Basic")}) $ do
+        it "makes sure we get a 401 when access is not authorized" $ do
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 401, matchHeaders = ["WWW-Authenticate" <:> "Basic"]}
+
     describe "406 Not Acceptable" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "")]
