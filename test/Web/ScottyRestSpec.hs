@@ -1,40 +1,26 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Web.ScottyRestSpec (main, spec) where
 
-import           Test.Hspec
-import           Test.Hspec.Wai
-import           Network.Wai (Application)
-
---import           Control.Monad
---import           Data.Char
---import           Data.String
---import           Network.HTTP.Types
---import qualified Control.Exception.Lifted as EL
--- import qualified Control.Exception as E
-
---import           Web.Scotty as Scotty hiding (get, post, put, patch, delete, request, options)
-import           Web.Scotty.Trans hiding (get, post, put, patch, delete, request)
---import qualified Web.Scotty.Trans as ScottyTrans
---import qualified Web.Scotty as Scotty
-import qualified Web.Scotty.Rest as Rest
-import           Web.Scotty.Rest (RestConfig(..), StdMethod(..))
-import qualified Test.QuickCheck as QC
+import Test.Hspec
+import Test.Hspec.Wai
 import Test.Hspec.Wai.Internal
--- import Data.ByteString (pack)
-import Data.ByteString.Char8 (pack)
+import Test.QuickCheck (Arbitrary, arbitrary, elements, property)
 
-instance QC.Arbitrary Rest.StdMethod where
-  arbitrary = QC.elements (enumFromTo minBound maxBound)
+import Web.Scotty.Trans hiding (get, post, put, patch, delete, request)
+import qualified Web.Scotty.Rest as Rest
+import Web.Scotty.Rest (RestConfig(..), StdMethod(..))
+
+import Data.ByteString.Char8 (pack)
+import Network.Wai (Application)
+
+instance Arbitrary Rest.StdMethod where
+  arbitrary = elements (enumFromTo minBound maxBound)
 
 main :: IO ()
 main = hspec spec
-
--- availableMethods :: [StdMethod]
--- availableMethods = [GET, POST, HEAD, PUT, PATCH, DELETE, OPTIONS]
 
 withApp :: ScottyT e IO () -> SpecWith Application -> Spec
 withApp = with . scottyAppT id id
@@ -49,7 +35,7 @@ spec = do
 
     describe "405 Method not allowed" $ do
       it "makes sure we get a 405 when method is not allowed" $ do
-        QC.property $ \(m :: Rest.StdMethod) ms -> do
+        property $ \m ms -> do
           app <- scottyAppT id id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
           let expected = if | m == OPTIONS && m `elem` ms -> 200
                             | m `elem` ms                 -> 406
