@@ -6,6 +6,7 @@ module Web.Scotty.Rest
 ( RestConfig(..)
 , RestException(..)
 , ProcessingResult(..)
+, Moved(..)
 , defaultConfig
 , rest
 , StdMethod(..)
