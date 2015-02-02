@@ -1,0 +1,88 @@
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+module Web.ScottyRestSpec (main, spec) where
+
+import           Test.Hspec
+import           Test.Hspec.Wai
+import           Network.Wai (Application)
+
+--import           Control.Monad
+--import           Data.Char
+--import           Data.String
+--import           Network.HTTP.Types
+--import qualified Control.Exception.Lifted as EL
+-- import qualified Control.Exception as E
+
+--import           Web.Scotty as Scotty hiding (get, post, put, patch, delete, request, options)
+import           Web.Scotty.Trans hiding (get, post, put, patch, delete, request)
+--import qualified Web.Scotty.Trans as ScottyTrans
+--import qualified Web.Scotty as Scotty
+import qualified Web.Scotty.Rest as ScottyRest
+import           Web.Scotty.Rest (RestConfig(..), StdMethod(..))
+import qualified Test.QuickCheck as QC
+import Test.Hspec.Wai.Internal
+-- import Data.ByteString (pack)
+import Data.ByteString.Char8 (pack)
+
+instance QC.Arbitrary ScottyRest.StdMethod where
+  arbitrary = QC.elements (enumFromTo minBound maxBound)
+
+main :: IO ()
+main = hspec spec
+
+-- availableMethods :: [StdMethod]
+-- availableMethods = [GET, POST, HEAD, PUT, PATCH, DELETE, OPTIONS]
+
+withApp :: ScottyT e IO () -> SpecWith Application -> Spec
+withApp = with . scottyAppT id id
+
+spec :: Spec
+spec = do
+  describe "HTTP" $ do
+    describe "503 Not available" $ do
+      withApp (ScottyRest.rest "/" ScottyRest.defaultConfig {serviceAvailable = return False}) $ do
+        it "makes sure we get a 503 when serviceAvailable returns False" $ do
+          get "/" `shouldRespondWith` 503
+
+    describe "405 Method not allowed" $ do
+      it "makes sure we get a 405 when method is not allowed" $ do
+        QC.property $ \(m :: ScottyRest.StdMethod) ms -> do
+          app <- scottyAppT id id (ScottyRest.rest "/" ScottyRest.defaultConfig {allowedMethods = return ms})
+          let expected = if | m == OPTIONS && m `elem` ms -> 200
+                            | m `elem` ms                 -> 406
+                            | m `notElem` ms              -> 405
+          let waiSession = request ((pack . show) m) "/" [] "" `shouldRespondWith` "" {matchStatus = expected}
+          runWaiSession waiSession app
+
+    describe "406 Not Acceptable" $ do
+      withApp (ScottyRest.rest "/" ScottyRest.defaultConfig {
+        contentTypesProvided = return [("text/html",text "")]
+      }) $ do
+        it "makes sure we get a 406 when we don't provided the requested type" $ do
+          request "GET" "/" [("Accept","*/*")]        ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept","text/plain")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+
+    describe "Content negotiation" $ do
+      withApp (ScottyRest.rest "/" ScottyRest.defaultConfig {
+        contentTypesProvided = return [("text/html",text "html"), ("application/json",json ("json" :: String))]
+      }) $ do
+        it "makes sure we get the appropriate content" $ do
+          request "GET" "/" [] ""
+            `shouldRespondWith` "html" {matchStatus = 200}
+          request "GET" "/" [("Accept","*/*")] ""
+            `shouldRespondWith` "html" {matchStatus = 200}
+          request "GET" "/" [("Accept","application/*")] ""
+            `shouldRespondWith` "\"json\"" {matchStatus = 200}
+          request "GET" "/" [("Accept","application/json")] ""
+            `shouldRespondWith` "\"json\"" {matchStatus = 200}
+          request "GET" "/" [("Accept","text/plain")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+          request "GET" "/" [("Accept","text/html;q=0.5, application/json")] ""
+            `shouldRespondWith` "\"json\"" {matchStatus = 200}
+          request "GET" "/" [("Accept","text/html;q=0.5, application/json;q=0.4")] ""
+            `shouldRespondWith` "html" {matchStatus = 200}

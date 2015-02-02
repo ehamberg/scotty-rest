@@ -37,3 +37,24 @@ library
                , aeson
   default-language:    Haskell2010
   GHC-options: -Wall
+
+test-suite spec
+  main-is:             Spec.hs
+  type:                exitcode-stdio-1.0
+  default-language:    Haskell2010
+  hs-source-dirs:      test
+  build-depends: base
+               ,  async
+               ,  bytestring
+               ,  data-default
+               ,  directory
+               ,  hspec
+               ,  hspec-wai >= 0.6
+               ,  http-types
+               ,  network
+               ,  QuickCheck
+               ,  scotty
+               ,  scotty-rest
+               ,  text
+               ,  wai
+  GHC-options: -Wall -threaded -fno-warn-orphans
