@@ -28,7 +28,7 @@ type Url = TL.Text
 data Moved = NotMoved | MovedTo Url
 data ResourceStatus = ResourceExists | ResourceDoesNotExist
 data ProcessingResult = ProcessingSucceeded
-                      | ProcessingSucceededWithUrl TL.Text
+                      | ProcessingSucceededWithUrl Url
                       | ProcessingFailed
 
 rest :: (MonadIO m) => RoutePattern -> RestConfig (ScottyRestM m) -> ScottyT RestException m ()
