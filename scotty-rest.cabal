@@ -58,3 +58,7 @@ test-suite spec
                ,  text
                ,  wai
   GHC-options: -Wall -threaded -fno-warn-orphans
+
+source-repository head
+  type:     git
+  location: git://github.com/ehamberg/scotty-rest.git
