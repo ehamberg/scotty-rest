@@ -53,7 +53,7 @@ spec = do
         contentTypesProvided = return [("text/html",text "")]
       }) $ do
         it "makes sure we get a 406 when we don't provided the requested type" $ do
-          request "GET" "/" [("Accept","*/*")]        ""
+          request "GET" "/" [("Accept","*/*")] ""
             `shouldRespondWith` "" {matchStatus = 200}
           request "GET" "/" [("Accept","text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 406}
