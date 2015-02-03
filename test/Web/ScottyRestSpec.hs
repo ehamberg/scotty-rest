@@ -31,7 +31,7 @@ spec = do
     describe "503 Not available" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $ do
         it "makes sure we get a 503 when serviceAvailable returns False" $ do
-          get "/" `shouldRespondWith` 503
+          request "GET" "/" [] "" `shouldRespondWith` 503
 
     describe "405 Method not allowed" $ do
       it "makes sure we get a 405 when method is not allowed" $ do
