@@ -48,6 +48,26 @@ spec = do
         it "makes sure we get a 401 when access is not authorized" $ do
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 401, matchHeaders = ["WWW-Authenticate" <:> "Basic"]}
 
+    describe "404 Not Found" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          resourceExists = return False,
+          contentTypesProvided = return [("text/html",undefined)]
+        }) $ do
+        it "makes sure we get a 404 when resource does not exist and did not exist previously" $ do
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 404}
+
+    describe "410 Gone" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          resourceExists = return False,
+          previouslyExisted = return True,
+          allowedMethods = return [GET, POST],
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",undefined)]
+        }) $ do
+        it "makes sure we get a 410 when resource does not exist, but did exist previously" $ do
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
+          -- request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
+
     describe "406 Not Acceptable" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "")]

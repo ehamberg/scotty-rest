@@ -40,6 +40,7 @@ rest pattern handler = matchAny pattern (restHandlerStart handler `rescue` handl
 data RestConfig m = RestConfig
   { allowedMethods       :: m [StdMethod]
   , resourceExists       :: m Bool
+  , previouslyExisted    :: m Bool
   , contentTypesAccepted :: m [(MediaType, m ProcessingResult)]
   , contentTypesProvided :: m [(MediaType, m ())]
   , optionsHandler       :: m (Maybe (m ()))
@@ -54,6 +55,7 @@ defaultConfig :: (MonadIO m) => RestConfig (ScottyRestM m)
 defaultConfig = RestConfig
   { allowedMethods       = return [GET, HEAD, OPTIONS]
   , resourceExists       = return True
+  , previouslyExisted    = return False
   , contentTypesAccepted = return []
   , contentTypesProvided = return []
   , optionsHandler       = return Nothing
@@ -67,6 +69,7 @@ defaultConfig = RestConfig
 data RestException = MovedPermanently301
                    | MovedTemporarily307
                    | Unauthorized401
+                   | NotFound404
                    | NotAcceptable406
                    | Gone410
                    | NotImplemented501
@@ -158,7 +161,11 @@ handleGetHeadExisting handler _callBacks = do
 handleGetHeadNonExisting :: (MonadIO m) => ScottyRestM m () -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
 handleGetHeadNonExisting _handler config = do
   -- TODO: Has if match? If so: 412
-  -- TODO: Previously existed? If so: 404
+
+  -- Did this resource exist before?
+  existed <- previouslyExisted config
+  unless existed (raise NotFound404)
+
   movedPermanently config >>= moved MovedPermanently301
   movedTemporarily config >>= moved MovedTemporarily307
   raise Gone410
@@ -186,6 +193,7 @@ handleExcept :: (Monad m) => RestException -> ScottyRestM m ()
 handleExcept MovedPermanently301     = status movedPermanently301
 handleExcept MovedTemporarily307     = status temporaryRedirect307
 handleExcept Unauthorized401         = status unauthorized401
+handleExcept NotFound404             = status notFound404
 handleExcept MethodNotAllowed405     = status methodNotAllowed405
 handleExcept NotAcceptable406        = status notAcceptable406
 handleExcept Gone410                 = status gone410
