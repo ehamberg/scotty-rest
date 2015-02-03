@@ -29,7 +29,6 @@ type Url = TL.Text
 type Challenge = TL.Text
 
 data Moved = NotMoved | MovedTo Url
-data ResourceStatus = ResourceExists | ResourceDoesNotExist
 data ProcessingResult = ProcessingSucceeded
                       | ProcessingSucceededWithUrl Url
                       | ProcessingFailed
@@ -40,7 +39,7 @@ rest pattern handler = matchAny pattern (restHandlerStart handler `rescue` handl
 
 data RestConfig m = RestConfig
   { allowedMethods       :: m [StdMethod]
-  , resourceExists       :: m ResourceStatus
+  , resourceExists       :: m Bool
   , contentTypesAccepted :: m [(MediaType, m ProcessingResult)]
   , contentTypesProvided :: m [(MediaType, m ())]
   , optionsHandler       :: m (Maybe (m ()))
@@ -54,7 +53,7 @@ data RestConfig m = RestConfig
 defaultConfig :: (MonadIO m) => RestConfig (ScottyRestM m)
 defaultConfig = RestConfig
   { allowedMethods       = return [GET, HEAD, OPTIONS]
-  , resourceExists       = return ResourceExists
+  , resourceExists       = return True
   , contentTypesAccepted = return []
   , contentTypesProvided = return []
   , optionsHandler       = return Nothing
@@ -140,18 +139,24 @@ contentNegotiation method config = do
 checkResourceExists :: (MonadIO m) => StdMethod -> ScottyRestM m () -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
 checkResourceExists method handler config = do
   exists <- resourceExists config
-  if | method `elem` [GET, HEAD]        -> handleGetHead exists handler config
-     | method `elem` [PUT, POST, PATCH] -> handlePutPostPatch exists config
+  if | method `elem` [GET, HEAD]        -> if exists
+                                              then handleGetHeadExisting handler config
+                                              else handleGetHeadNonExisting handler config
+     | method `elem` [PUT, POST, PATCH] -> if exists
+                                              then handlePutPostPatchExisting config
+                                              else handlePutPostPatchNonExisting config
 
-handleGetHead :: (MonadIO m) => ResourceStatus -> ScottyRestM m () -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
-handleGetHead ResourceExists handler _callBacks = do
+handleGetHeadExisting :: (MonadIO m) => ScottyRestM m () -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handleGetHeadExisting handler _callBacks = do
   -- TODO: generate etag
   -- TODO: last modified
   -- TODO: expires
   handler -- TODO: allow streaming a response
   status ok200
   -- TODO: multiple choices
-handleGetHead ResourceDoesNotExist _handler config = do
+
+handleGetHeadNonExisting :: (MonadIO m) => ScottyRestM m () -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handleGetHeadNonExisting _handler config = do
   -- TODO: Has if match? If so: 412
   -- TODO: Previously existed? If so: 404
   movedPermanently config >>= moved MovedPermanently301
@@ -160,8 +165,14 @@ handleGetHead ResourceDoesNotExist _handler config = do
     where moved e = \case NotMoved    -> return ()
                           MovedTo url -> setHeader "location" url >> raise e
 
-handlePutPostPatch :: (MonadIO m) => ResourceStatus -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
-handlePutPostPatch _exists config = do
+handlePutPostPatchNonExisting :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handlePutPostPatchNonExisting config = handlePutPostPatch config -- FIXME
+
+handlePutPostPatchExisting :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handlePutPostPatchExisting config = handlePutPostPatch config -- FIXME
+
+handlePutPostPatch :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handlePutPostPatch config = do
   contentType <- liftM (encodeUtf8 . TL.toStrict . fromMaybe undefined) (header "content-type")
   handlers <- contentTypesAccepted config
   text (TL.pack . show $ contentType)
