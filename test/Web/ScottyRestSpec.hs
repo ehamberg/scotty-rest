@@ -68,6 +68,26 @@ spec = do
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
           -- request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
 
+    describe "301 Moved Permanently" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          resourceExists = return False,
+          previouslyExisted = return True,
+          movedPermanently = return (Rest.MovedTo "xxx"),
+          contentTypesProvided = return [("text/html",undefined)]
+        }) $ do
+        it "makes sure we get a 301 when a resource existed before and is moved permanently" $ do
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 301, matchHeaders = ["Location" <:> "xxx"]}
+
+    describe "307 Moved Temporarily" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          resourceExists = return False,
+          previouslyExisted = return True,
+          movedTemporarily = return (Rest.MovedTo "xxx"),
+          contentTypesProvided = return [("text/html",undefined)]
+        }) $ do
+        it "makes sure we get a 307 when a resource existed before and is moved temporarily" $ do
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 307, matchHeaders = ["Location" <:> "xxx"]}
+
     describe "406 Not Acceptable" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "")]
