@@ -13,6 +13,7 @@ import Web.Scotty.Trans hiding (get, post, put, patch, delete, request)
 import qualified Web.Scotty.Rest as Rest
 import Web.Scotty.Rest (RestConfig(..), StdMethod(..))
 
+import Control.Monad (liftM)
 import Data.ByteString.Char8 (pack)
 import Network.Wai (Application)
 
@@ -28,13 +29,13 @@ withApp = with . scottyAppT id id
 spec :: Spec
 spec = do
   describe "HTTP" $ do
-    describe "503 Not available" $ do
-      withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $ do
-        it "makes sure we get a 503 when serviceAvailable returns False" $ do
+    describe "503 Not available" $
+      withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $
+        it "makes sure we get a 503 when serviceAvailable returns False" $
           request "GET" "/" [] "" `shouldRespondWith` 503
 
-    describe "405 Method not allowed" $ do
-      it "makes sure we get a 405 when method is not allowed" $ do
+    describe "405 Method not allowed" $
+      it "makes sure we get a 405 when method is not allowed" $
         property $ \m ms -> do
           app <- scottyAppT id id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
           let expected = if | m == OPTIONS && m `elem` ms -> 200
@@ -43,65 +44,65 @@ spec = do
           let waiSession = request ((pack . show) m) "/" [] "" `shouldRespondWith` "" {matchStatus = expected}
           runWaiSession waiSession app
 
-    describe "401 Unauthorized" $ do
-      withApp (Rest.rest "/" Rest.defaultConfig {isAuthorized = return (Rest.NotAuthorized "Basic")}) $ do
-        it "makes sure we get a 401 when access is not authorized" $ do
+    describe "401 Unauthorized" $
+      withApp (Rest.rest "/" Rest.defaultConfig {isAuthorized = return (Rest.NotAuthorized "Basic")}) $
+        it "makes sure we get a 401 when access is not authorized" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 401, matchHeaders = ["WWW-Authenticate" <:> "Basic"]}
 
-    describe "404 Not Found" $ do
+    describe "404 Not Found" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
           contentTypesProvided = return [("text/html",undefined)]
-        }) $ do
-        it "makes sure we get a 404 when resource does not exist and did not exist previously" $ do
+        }) $
+        it "makes sure we get a 404 when resource does not exist and did not exist previously" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 404}
 
-    describe "410 Gone" $ do
+    describe "410 Gone" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
           previouslyExisted = return True,
           allowedMethods = return [GET, POST],
           contentTypesProvided = return [("text/html",undefined)],
           contentTypesAccepted = return [("application/json",undefined)]
-        }) $ do
-        it "makes sure we get a 410 when resource does not exist, but did exist previously" $ do
+        }) $
+        it "makes sure we get a 410 when resource does not exist, but did exist previously" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
           -- request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
 
-    describe "301 Moved Permanently" $ do
+    describe "301 Moved Permanently" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
           previouslyExisted = return True,
           movedPermanently = return (Rest.MovedTo "xxx"),
           contentTypesProvided = return [("text/html",undefined)]
-        }) $ do
-        it "makes sure we get a 301 when a resource existed before and is moved permanently" $ do
+        }) $
+        it "makes sure we get a 301 when a resource existed before and is moved permanently" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 301, matchHeaders = ["Location" <:> "xxx"]}
 
-    describe "307 Moved Temporarily" $ do
+    describe "307 Moved Temporarily" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
           previouslyExisted = return True,
           movedTemporarily = return (Rest.MovedTo "xxx"),
           contentTypesProvided = return [("text/html",undefined)]
-        }) $ do
-        it "makes sure we get a 307 when a resource existed before and is moved temporarily" $ do
+        }) $
+        it "makes sure we get a 307 when a resource existed before and is moved temporarily" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 307, matchHeaders = ["Location" <:> "xxx"]}
 
-    describe "406 Not Acceptable" $ do
+    describe "406 Not Acceptable" $
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "")]
-      }) $ do
+      }) $
         it "makes sure we get a 406 when we don't provided the requested type" $ do
           request "GET" "/" [("Accept","*/*")] ""
             `shouldRespondWith` "" {matchStatus = 200}
           request "GET" "/" [("Accept","text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 406}
 
-    describe "Content negotiation" $ do
+    describe "Content negotiation" $
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "html"), ("application/json",json ("json" :: String))]
-      }) $ do
+      }) $
         it "makes sure we get the appropriate content" $ do
           request "GET" "/" [] ""
             `shouldRespondWith` "html" {matchStatus = 200}
