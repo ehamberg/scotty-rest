@@ -20,7 +20,7 @@ import Network.HTTP.Types (parseMethod)
 import Network.HTTP.Types.Status
 import Network.HTTP.Media (MediaType, mapAccept, mapContent)
 import qualified Data.Text.Lazy as TL
-import Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text.Encoding as E
 import Network.Wai (requestMethod)
 import Data.String (fromString)
 import Control.Monad.State
@@ -128,7 +128,7 @@ contentNegotiation :: (MonadIO m) => StdMethod -> RestConfig (ScottyRestM m) -> 
 contentNegotiation method config = do
   -- If there is an `Accept` header, raise a NotAcceptable406 exception if we
   -- cannot provide that type:
-  accept <- return . encodeUtf8 . TL.toStrict . fromMaybe "*/*" =<< header "accept"
+  accept <- return . E.encodeUtf8 . TL.toStrict . fromMaybe "*/*" =<< header "accept"
   provided <- contentTypesProvided config
   handler <- maybe (raise NotAcceptable406) return (mapAccept provided accept)
 
