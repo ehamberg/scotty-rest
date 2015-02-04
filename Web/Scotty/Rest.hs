@@ -83,6 +83,7 @@ instance ScottyError RestException where
   showError = fromString . show
 
 type ScottyRestM m = ActionT RestException m
+type RestHandler m = ScottyRestM m ()
 
 restHandlerStart :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
 restHandlerStart config = do
@@ -139,7 +140,7 @@ contentNegotiation method config = do
 
   checkResourceExists method handler config
 
-checkResourceExists :: (MonadIO m) => StdMethod -> ScottyRestM m () -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+checkResourceExists :: (MonadIO m) => StdMethod -> RestHandler m -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
 checkResourceExists method handler config = do
   exists <- resourceExists config
   if | method `elem` [GET, HEAD]        -> if exists
@@ -149,7 +150,7 @@ checkResourceExists method handler config = do
                                               then handlePutPostPatchExisting config
                                               else handlePutPostPatchNonExisting config
 
-handleGetHeadExisting :: (MonadIO m) => ScottyRestM m () -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handleGetHeadExisting :: (MonadIO m) => RestHandler m -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
 handleGetHeadExisting handler _callBacks = do
   -- TODO: generate etag
   -- TODO: last modified
@@ -158,7 +159,7 @@ handleGetHeadExisting handler _callBacks = do
   status ok200
   -- TODO: multiple choices
 
-handleGetHeadNonExisting :: (MonadIO m) => ScottyRestM m () -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handleGetHeadNonExisting :: (MonadIO m) => RestHandler m -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
 handleGetHeadNonExisting _handler config = do
   -- TODO: Has if match? If so: 412
 
