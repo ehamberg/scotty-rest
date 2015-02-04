@@ -23,6 +23,7 @@ library
   Exposed-modules:     Web.Scotty.Rest
 
   build-depends: base         >= 4.7   && < 4.8
+               , bytestring   >= 0.10  && < 0.11
                , http-media   >= 0.4   && < 0.5
                , http-types   >= 0.8   && < 0.9
                , scotty       >= 0.9   && < 1.0

@@ -18,10 +18,12 @@ import Web.Scotty.Trans
 import Network.HTTP.Types.Method (StdMethod(..))
 import Network.HTTP.Types (parseMethod)
 import Network.HTTP.Types.Status
-import Network.HTTP.Media (MediaType, mapAccept, mapContent)
+import Network.HTTP.Media (MediaType, mapAccept, mapContent, renderHeader)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as E
+import qualified Data.Text.Lazy.Encoding as LE
 import Network.Wai (requestMethod)
+import qualified Data.ByteString.Lazy as BS
 import Data.String (fromString)
 import Control.Monad.State
 
@@ -29,9 +31,10 @@ type Url = TL.Text
 type Challenge = TL.Text
 
 data Moved = NotMoved | MovedTo Url
-data ProcessingResult = ProcessingSucceeded
-                      | ProcessingSucceededWithUrl Url
-                      | ProcessingFailed
+data ProcessingResult = Succeeded
+                      | SucceededWithContent MediaType TL.Text
+                      | SucceededWithUrl Url
+                      | Failed
 data Authorized = Authorized | NotAuthorized Challenge
 
 rest :: (MonadIO m) => RoutePattern -> RestConfig (ScottyRestM m) -> ScottyT RestException m ()
@@ -41,6 +44,7 @@ data RestConfig m = RestConfig
   { allowedMethods       :: m [StdMethod]
   , resourceExists       :: m Bool
   , previouslyExisted    :: m Bool
+  , isConflict           :: m Bool
   , contentTypesAccepted :: m [(MediaType, m ProcessingResult)]
   , contentTypesProvided :: m [(MediaType, m ())]
   , optionsHandler       :: m (Maybe (m ()))
@@ -56,6 +60,7 @@ defaultConfig = RestConfig
   { allowedMethods       = return [GET, HEAD, OPTIONS]
   , resourceExists       = return True
   , previouslyExisted    = return False
+  , isConflict           = return False
   , contentTypesAccepted = return []
   , contentTypesProvided = return []
   , optionsHandler       = return Nothing
@@ -68,10 +73,13 @@ defaultConfig = RestConfig
 
 data RestException = MovedPermanently301
                    | MovedTemporarily307
+                   | BadRequest400
                    | Unauthorized401
                    | NotFound404
                    | NotAcceptable406
+                   | Conflict409
                    | Gone410
+                   | UnsupportedMediaType415
                    | NotImplemented501
                    | ServiceUnavailable503
                    | MethodNotAllowed405
@@ -147,16 +155,15 @@ checkResourceExists method handler config = do
                                               then handleGetHeadExisting handler config
                                               else handleGetHeadNonExisting handler config
      | method `elem` [PUT, POST, PATCH] -> if exists
-                                              then handlePutPostPatchExisting config
-                                              else handlePutPostPatchNonExisting config
+                                              then handlePutPostPatchExisting method config
+                                              else handlePutPostPatchNonExisting method config
 
 handleGetHeadExisting :: (MonadIO m) => RestHandler m -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
 handleGetHeadExisting handler _callBacks = do
   -- TODO: generate etag
   -- TODO: last modified
   -- TODO: expires
-  handler -- TODO: allow streaming a response
-  status ok200
+  handler
   -- TODO: multiple choices
 
 handleGetHeadNonExisting :: (MonadIO m) => RestHandler m -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
@@ -173,30 +180,48 @@ handleGetHeadNonExisting _handler config = do
     where moved e = \case NotMoved    -> return ()
                           MovedTo url -> setHeader "location" url >> raise e
 
-handlePutPostPatchNonExisting :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
-handlePutPostPatchNonExisting config = handlePutPostPatch config -- FIXME
+handlePutPostPatchNonExisting :: (MonadIO m) => StdMethod -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handlePutPostPatchNonExisting _method config = acceptResource config -- FIXME
 
-handlePutPostPatchExisting :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
-handlePutPostPatchExisting config = handlePutPostPatch config -- FIXME
+handlePutPostPatchExisting :: (MonadIO m) => StdMethod -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handlePutPostPatchExisting method config = do
+  -- TODO: cond
+  when (method == PUT) $ do
+    conflict <- isConflict config
+    when conflict (raise Conflict409)
 
-handlePutPostPatch :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
-handlePutPostPatch config = do
-  contentType <- liftM (encodeUtf8 . TL.toStrict . fromMaybe undefined) (header "content-type")
+  acceptResource config
+
+
+acceptResource :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
+acceptResource config = do
+  -- Is there a Content-Type header?
+  contentTypeHeader <- header "content-type"
+  contentType <- maybe (raise UnsupportedMediaType415) (return . E.encodeUtf8 . TL.toStrict) contentTypeHeader
+
+  -- Do we have a handler for this content type? If so, run it. Alternatively, return 415.
   handlers <- contentTypesAccepted config
-  text (TL.pack . show $ contentType)
-  result <- fromMaybe (raise NotAcceptable406) (mapContent handlers contentType)
+  result <- fromMaybe (raise UnsupportedMediaType415) (mapContent handlers contentType)
+
   case result of
-       ProcessingFailed               -> status badRequest400
-       ProcessingSucceeded            -> status noContent204
-       ProcessingSucceededWithUrl url -> setHeader "location" url >> status seeOther303
+       Failed                   -> status badRequest400
+       Succeeded                -> status noContent204
+       SucceededWithUrl url     -> setHeader "location" url >> status seeOther303
+       SucceededWithContent t c -> setContentTypeHeader t >> (raw . LE.encodeUtf8) c
+
+setContentTypeHeader :: (Monad m) => MediaType -> ScottyRestM m ()
+setContentTypeHeader = setHeader "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
 
 handleExcept :: (Monad m) => RestException -> ScottyRestM m ()
 handleExcept MovedPermanently301     = status movedPermanently301
 handleExcept MovedTemporarily307     = status temporaryRedirect307
+handleExcept BadRequest400           = status badRequest400
 handleExcept Unauthorized401         = status unauthorized401
 handleExcept NotFound404             = status notFound404
 handleExcept MethodNotAllowed405     = status methodNotAllowed405
 handleExcept NotAcceptable406        = status notAcceptable406
+handleExcept Conflict409             = status conflict409
+handleExcept UnsupportedMediaType415 = status unsupportedMediaType415
 handleExcept Gone410                 = status gone410
 handleExcept ServiceUnavailable503   = status serviceUnavailable503
 handleExcept NotImplemented501       = status notImplemented501

@@ -15,6 +15,7 @@ import Web.Scotty.Rest (RestConfig(..), StdMethod(..))
 
 import Control.Monad (liftM)
 import Data.ByteString.Char8 (pack)
+import Data.Text.Lazy.Encoding (decodeUtf8)
 import Network.Wai (Application)
 
 instance Arbitrary Rest.StdMethod where
@@ -118,3 +119,15 @@ spec = do
             `shouldRespondWith` "\"json\"" {matchStatus = 200}
           request "GET" "/" [("Accept","text/html;q=0.5, application/json;q=0.4")] ""
             `shouldRespondWith` "html" {matchStatus = 200}
+
+  describe "Test servers" $
+    describe "Echo server" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          contentTypesProvided = return [("text/plain",text "wtf")],
+          contentTypesAccepted = return [("text/plain",liftM (Rest.SucceededWithContent  "text/plain" . decodeUtf8) body)],
+          allowedMethods = return [POST]
+        }) $
+        it "makes sure we can POST a text/plain body and get it back" $
+          request "POST" "/" [("Content-Type","text/plain"), ("Accept","text/plain")] "hello"
+            `shouldRespondWith` "hello" {matchStatus = 200, matchHeaders = ["Content-Type" <:> "text/plain"]}
+
