@@ -100,6 +100,17 @@ spec = do
           request "GET" "/" [("Accept","text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 406}
 
+    describe "409 Conflict" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [PUT],
+          isConflict = return True,
+          contentTypesProvided = return [("text/plain",undefined)],
+          contentTypesAccepted = return [("text/plain",undefined)]
+        }) $
+        it "makes sure we get a 409 when there is a conflict" $
+          request "PUT" "/" [("Content-Type","text/plain"), ("Accept","text/plain")] ""
+            `shouldRespondWith` "" {matchStatus = 409}
+
     describe "Content negotiation" $
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "html"), ("application/json",json ("json" :: String))]
