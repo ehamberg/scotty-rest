@@ -37,8 +37,8 @@ data ProcessingResult = Succeeded
                       | Failed
 data Authorized = Authorized | NotAuthorized Challenge
 
-rest :: (MonadIO m) => RoutePattern -> RestConfig (ScottyRestM m) -> ScottyT RestException m ()
-rest pattern handler = matchAny pattern (restHandlerStart handler `rescue` handleExcept)
+type ScottyRestM m = ActionT RestException m
+type RestHandler m = ScottyRestM m ()
 
 data RestConfig m = RestConfig
   { allowedMethods       :: m [StdMethod]
@@ -90,8 +90,8 @@ instance ScottyError RestException where
   stringError = InternalServerError . TL.pack
   showError = fromString . show
 
-type ScottyRestM m = ActionT RestException m
-type RestHandler m = ScottyRestM m ()
+rest :: (MonadIO m) => RoutePattern -> RestConfig (ScottyRestM m) -> ScottyT RestException m ()
+rest pattern config = matchAny pattern (restHandlerStart config `rescue` handleExcept)
 
 restHandlerStart :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
 restHandlerStart config = do
