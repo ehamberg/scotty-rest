@@ -37,25 +37,25 @@ data ProcessingResult = Succeeded
                       | Failed
 data Authorized = Authorized | NotAuthorized Challenge
 
-type ScottyRestM m = ActionT RestException m
-type RestHandler m = ScottyRestM m ()
+type RestM = ActionT RestException IO
+type Handler = RestM ()
 
-data RestConfig m = RestConfig
-  { allowedMethods       :: m [StdMethod]
-  , resourceExists       :: m Bool
-  , previouslyExisted    :: m Bool
-  , isConflict           :: m Bool
-  , contentTypesAccepted :: m [(MediaType, m ProcessingResult)]
-  , contentTypesProvided :: m [(MediaType, m ())]
-  , optionsHandler       :: m (Maybe (m ()))
-  , charSetsProvided     :: m (Maybe [TL.Text])
-  , isAuthorized         :: m Authorized
-  , serviceAvailable     :: m Bool
-  , movedPermanently     :: m Moved
-  , movedTemporarily     :: m Moved
+data RestConfig = RestConfig
+  { allowedMethods       :: RestM [StdMethod]
+  , resourceExists       :: RestM Bool
+  , previouslyExisted    :: RestM Bool
+  , isConflict           :: RestM Bool
+  , contentTypesAccepted :: RestM [(MediaType, RestM ProcessingResult)]
+  , contentTypesProvided :: RestM [(MediaType, Handler)]
+  , optionsHandler       :: RestM (Maybe Handler)
+  , charSetsProvided     :: RestM (Maybe [TL.Text])
+  , isAuthorized         :: RestM Authorized
+  , serviceAvailable     :: RestM Bool
+  , movedPermanently     :: RestM Moved
+  , movedTemporarily     :: RestM Moved
   }
 
-defaultConfig :: (MonadIO m) => RestConfig (ScottyRestM m)
+defaultConfig :: RestConfig
 defaultConfig = RestConfig
   { allowedMethods       = return [GET, HEAD, OPTIONS]
   , resourceExists       = return True
@@ -90,10 +90,10 @@ instance ScottyError RestException where
   stringError = InternalServerError . TL.pack
   showError = fromString . show
 
-rest :: (MonadIO m) => RoutePattern -> RestConfig (ScottyRestM m) -> ScottyT RestException m ()
+rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern (restHandlerStart config `rescue` handleExcept)
 
-restHandlerStart :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
+restHandlerStart :: RestConfig -> ActionT RestException IO ()
 restHandlerStart config = do
   -- Is our service available?
   available <- serviceAvailable config
@@ -125,14 +125,14 @@ restHandlerStart config = do
      then handleOptions config
      else contentNegotiation method config
 
-setAllowHeader :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
+setAllowHeader :: RestConfig -> RestM ()
 setAllowHeader config =
   setHeader "allow" . TL.intercalate ", " . map (TL.pack . show) =<< allowedMethods config
 
-handleOptions :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handleOptions :: RestConfig -> RestM ()
 handleOptions config = fromMaybe (setAllowHeader config) =<< optionsHandler config
 
-contentNegotiation :: (MonadIO m) => StdMethod -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+contentNegotiation :: StdMethod -> RestConfig -> RestM ()
 contentNegotiation method config = do
   -- If there is an `Accept` header, raise a NotAcceptable406 exception if we
   -- cannot provide that type:
@@ -148,7 +148,7 @@ contentNegotiation method config = do
 
   checkResourceExists method handler config
 
-checkResourceExists :: (MonadIO m) => StdMethod -> RestHandler m -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+checkResourceExists :: StdMethod -> Handler -> RestConfig -> RestM ()
 checkResourceExists method handler config = do
   exists <- resourceExists config
   if | method `elem` [GET, HEAD]        -> if exists
@@ -158,7 +158,7 @@ checkResourceExists method handler config = do
                                               then handlePutPostPatchExisting method config
                                               else handlePutPostPatchNonExisting method config
 
-handleGetHeadExisting :: (MonadIO m) => RestHandler m -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handleGetHeadExisting :: Handler -> RestConfig -> RestM ()
 handleGetHeadExisting handler _callBacks = do
   -- TODO: generate etag
   -- TODO: last modified
@@ -166,7 +166,7 @@ handleGetHeadExisting handler _callBacks = do
   handler
   -- TODO: multiple choices
 
-handleGetHeadNonExisting :: (MonadIO m) => RestHandler m -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handleGetHeadNonExisting ::  Handler -> RestConfig -> RestM ()
 handleGetHeadNonExisting _handler config = do
   -- TODO: Has if match? If so: 412
 
@@ -180,10 +180,10 @@ handleGetHeadNonExisting _handler config = do
     where moved e = \case NotMoved    -> return ()
                           MovedTo url -> setHeader "location" url >> raise e
 
-handlePutPostPatchNonExisting :: (MonadIO m) => StdMethod -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handlePutPostPatchNonExisting :: StdMethod -> RestConfig -> RestM ()
 handlePutPostPatchNonExisting _method config = acceptResource config -- FIXME
 
-handlePutPostPatchExisting :: (MonadIO m) => StdMethod -> RestConfig (ScottyRestM m) -> ScottyRestM m ()
+handlePutPostPatchExisting :: StdMethod -> RestConfig -> RestM ()
 handlePutPostPatchExisting method config = do
   -- TODO: cond
   when (method == PUT) $ do
@@ -193,7 +193,7 @@ handlePutPostPatchExisting method config = do
   acceptResource config
 
 
-acceptResource :: (MonadIO m) => RestConfig (ScottyRestM m) -> ScottyRestM m ()
+acceptResource :: RestConfig -> RestM ()
 acceptResource config = do
   -- Is there a Content-Type header?
   contentTypeHeader <- header "content-type"
@@ -209,10 +209,10 @@ acceptResource config = do
        SucceededWithUrl url     -> setHeader "location" url >> status seeOther303
        SucceededWithContent t c -> setContentTypeHeader t >> (raw . LE.encodeUtf8) c
 
-setContentTypeHeader :: (Monad m) => MediaType -> ScottyRestM m ()
+setContentTypeHeader :: MediaType -> RestM ()
 setContentTypeHeader = setHeader "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
 
-handleExcept :: (Monad m) => RestException -> ScottyRestM m ()
+handleExcept :: RestException -> ActionT RestException IO ()
 handleExcept MovedPermanently301     = status movedPermanently301
 handleExcept MovedTemporarily307     = status temporaryRedirect307
 handleExcept BadRequest400           = status badRequest400
