@@ -25,6 +25,7 @@ import qualified Data.Text.Lazy.Encoding as LE
 import Network.Wai (Request, requestMethod)
 import qualified Data.ByteString.Lazy as BS
 import Data.String (fromString)
+import Data.Default.Class (Default(..), def)
 import Control.Monad.State
 
 type Url = TL.Text
@@ -37,7 +38,14 @@ data ProcessingResult = Succeeded
                       | Failed
 data Authorized = Authorized | NotAuthorized Challenge
 
-type RestM = StateT Int (ActionT RestException IO)
+data RequestState = RequestState
+  { _method :: Maybe StdMethod
+  }
+
+instance Default RequestState where
+  def = RequestState Nothing
+
+type RestM = StateT RequestState (ActionT RestException IO)
 type Handler = ActionT RestException IO
 
 data RestConfig = RestConfig
@@ -92,7 +100,7 @@ instance ScottyError RestException where
 
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern $ do
-  let run = evalStateT (restHandlerStart config) 0
+  let run = evalStateT (restHandlerStart config) def
   run `rescue` handleExcept
 
 stopWith :: RestException -> RestM a
