@@ -64,21 +64,20 @@ data RestConfig = RestConfig
   , movedTemporarily     :: RestM Moved
   }
 
-defaultConfig :: RestConfig
-defaultConfig = RestConfig
-  { allowedMethods       = return [GET, HEAD, OPTIONS]
-  , resourceExists       = return True
-  , previouslyExisted    = return False
-  , isConflict           = return False
-  , contentTypesAccepted = return []
-  , contentTypesProvided = return []
-  , optionsHandler       = return Nothing
-  , charSetsProvided     = return Nothing
-  , isAuthorized         = return Authorized
-  , serviceAvailable     = return True
-  , movedPermanently     = return NotMoved
-  , movedTemporarily     = return NotMoved
-  }
+instance Default RestConfig where
+ def = RestConfig { allowedMethods       = return [GET, HEAD, OPTIONS]
+                  , resourceExists       = return True
+                  , previouslyExisted    = return False
+                  , isConflict           = return False
+                  , contentTypesAccepted = return []
+                  , contentTypesProvided = return []
+                  , optionsHandler       = return Nothing
+                  , charSetsProvided     = return Nothing
+                  , isAuthorized         = return Authorized
+                  , serviceAvailable     = return True
+                  , movedPermanently     = return NotMoved
+                  , movedTemporarily     = return NotMoved
+                  }
 
 data RestException = MovedPermanently301
                    | MovedTemporarily307
@@ -98,6 +97,9 @@ data RestException = MovedPermanently301
 instance ScottyError RestException where
   stringError = InternalServerError . TL.pack
   showError = fromString . show
+
+defaultConfig :: RestConfig
+defaultConfig = def
 
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern $ do
