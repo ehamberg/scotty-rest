@@ -22,7 +22,7 @@ import Network.HTTP.Media (MediaType, mapAccept, mapContent, renderHeader)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as E
 import qualified Data.Text.Lazy.Encoding as LE
-import Network.Wai (requestMethod)
+import Network.Wai (Request, requestMethod)
 import qualified Data.ByteString.Lazy as BS
 import Data.String (fromString)
 import Control.Monad.State
@@ -37,17 +37,17 @@ data ProcessingResult = Succeeded
                       | Failed
 data Authorized = Authorized | NotAuthorized Challenge
 
-type RestM = ActionT RestException IO
-type Handler = RestM ()
+type RestM = StateT Int (ActionT RestException IO)
+type Handler = ActionT RestException IO
 
 data RestConfig = RestConfig
   { allowedMethods       :: RestM [StdMethod]
   , resourceExists       :: RestM Bool
   , previouslyExisted    :: RestM Bool
   , isConflict           :: RestM Bool
-  , contentTypesAccepted :: RestM [(MediaType, RestM ProcessingResult)]
-  , contentTypesProvided :: RestM [(MediaType, Handler)]
-  , optionsHandler       :: RestM (Maybe Handler)
+  , contentTypesAccepted :: RestM [(MediaType, Handler ProcessingResult)]
+  , contentTypesProvided :: RestM [(MediaType, Handler ())]
+  , optionsHandler       :: RestM (Maybe (Handler ()))
   , charSetsProvided     :: RestM (Maybe [TL.Text])
   , isAuthorized         :: RestM Authorized
   , serviceAvailable     :: RestM Bool
@@ -91,16 +91,39 @@ instance ScottyError RestException where
   showError = fromString . show
 
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
-rest pattern config = matchAny pattern (restHandlerStart config `rescue` handleExcept)
+rest pattern config = matchAny pattern $ do
+  let run = evalStateT (restHandlerStart config) 0
+  run `rescue` handleExcept
 
-restHandlerStart :: RestConfig -> ActionT RestException IO ()
+stopWith :: RestException -> RestM a
+stopWith = lift . raise
+
+runHandler :: Handler a -> RestM a
+runHandler = lift
+
+setHeader' :: TL.Text -> TL.Text -> RestM ()
+setHeader' h v = lift $ setHeader h v
+
+request' :: RestM Request
+request' = lift request
+
+header' :: TL.Text -> RestM (Maybe TL.Text)
+header' = lift . header
+
+status' :: Status -> RestM ()
+status' = lift . status
+
+raw' :: BS.ByteString -> RestM ()
+raw' = lift .raw
+
+restHandlerStart :: RestConfig -> RestM ()
 restHandlerStart config = do
   -- Is our service available?
   available <- serviceAvailable config
-  unless available $ raise ServiceUnavailable503
+  unless available (stopWith ServiceUnavailable503)
 
   ---- Is the method known?
-  method <- either (\_ -> raise NotImplemented501) return . parseMethod . requestMethod =<< request
+  method <- either (\_ -> stopWith NotImplemented501) return . parseMethod . requestMethod =<< request'
 
   -- TODO: Is the URI too long?
 
@@ -108,14 +131,14 @@ restHandlerStart config = do
   allowed <- allowedMethods config
   when (method `notElem` allowed) $ do
     setAllowHeader config
-    raise MethodNotAllowed405
+    stopWith MethodNotAllowed405
 
   -- TODO: Is the request malformed?
 
   -- Is the client authorized?
   isAuthorized config >>= \case
        Authorized                -> return ()
-       (NotAuthorized challenge) -> setHeader "WWW-Authenticate" challenge >> raise Unauthorized401
+       (NotAuthorized challenge) -> setHeader' "WWW-Authenticate" challenge >> stopWith Unauthorized401
 
   -- TODO: Is the client forbidden to access this resource?
   -- TODO: Are the content headers valid?
@@ -127,18 +150,18 @@ restHandlerStart config = do
 
 setAllowHeader :: RestConfig -> RestM ()
 setAllowHeader config =
-  setHeader "allow" . TL.intercalate ", " . map (TL.pack . show) =<< allowedMethods config
+  setHeader' "allow" . TL.intercalate ", " . map (TL.pack . show) =<< allowedMethods config
 
 handleOptions :: RestConfig -> RestM ()
-handleOptions config = fromMaybe (setAllowHeader config) =<< optionsHandler config
+handleOptions config = maybe (setAllowHeader config) runHandler =<< optionsHandler config
 
 contentNegotiation :: StdMethod -> RestConfig -> RestM ()
 contentNegotiation method config = do
-  -- If there is an `Accept` header, raise a NotAcceptable406 exception if we
-  -- cannot provide that type:
-  accept <- return . E.encodeUtf8 . TL.toStrict . fromMaybe "*/*" =<< header "accept"
+  -- If there is an `Accept` header, stop processing here and return a
+  -- NotAcceptable406 exception if we cannot provide that type:
+  accept <- return . E.encodeUtf8 . TL.toStrict . fromMaybe "*/*" =<< header' "accept"
   provided <- contentTypesProvided config
-  handler <- maybe (raise NotAcceptable406) return (mapAccept provided accept)
+  handler <- maybe (stopWith NotAcceptable406) return (mapAccept provided accept)
 
   -- TODO: If there is an `Accept-Language` header, check that we provide that
   -- language. If not → 406.
@@ -148,7 +171,7 @@ contentNegotiation method config = do
 
   checkResourceExists method handler config
 
-checkResourceExists :: StdMethod -> Handler -> RestConfig -> RestM ()
+checkResourceExists :: StdMethod -> Handler () -> RestConfig -> RestM ()
 checkResourceExists method handler config = do
   exists <- resourceExists config
   if | method `elem` [GET, HEAD]        -> if exists
@@ -158,27 +181,27 @@ checkResourceExists method handler config = do
                                               then handlePutPostPatchExisting method config
                                               else handlePutPostPatchNonExisting method config
 
-handleGetHeadExisting :: Handler -> RestConfig -> RestM ()
+handleGetHeadExisting :: Handler () -> RestConfig -> RestM ()
 handleGetHeadExisting handler _callBacks = do
   -- TODO: generate etag
   -- TODO: last modified
   -- TODO: expires
-  handler
+  runHandler handler
   -- TODO: multiple choices
 
-handleGetHeadNonExisting ::  Handler -> RestConfig -> RestM ()
+handleGetHeadNonExisting ::  Handler () -> RestConfig -> RestM ()
 handleGetHeadNonExisting _handler config = do
   -- TODO: Has if match? If so: 412
 
   -- Did this resource exist before?
   existed <- previouslyExisted config
-  unless existed (raise NotFound404)
+  unless existed (stopWith NotFound404)
 
   movedPermanently config >>= moved MovedPermanently301
   movedTemporarily config >>= moved MovedTemporarily307
-  raise Gone410
+  stopWith Gone410
     where moved e = \case NotMoved    -> return ()
-                          MovedTo url -> setHeader "location" url >> raise e
+                          MovedTo url -> setHeader' "location" url >> stopWith e
 
 handlePutPostPatchNonExisting :: StdMethod -> RestConfig -> RestM ()
 handlePutPostPatchNonExisting _method config = acceptResource config -- FIXME
@@ -188,7 +211,7 @@ handlePutPostPatchExisting method config = do
   -- TODO: cond
   when (method == PUT) $ do
     conflict <- isConflict config
-    when conflict (raise Conflict409)
+    when conflict (stopWith Conflict409)
 
   acceptResource config
 
@@ -196,21 +219,21 @@ handlePutPostPatchExisting method config = do
 acceptResource :: RestConfig -> RestM ()
 acceptResource config = do
   -- Is there a Content-Type header?
-  contentTypeHeader <- header "content-type"
-  contentType <- maybe (raise UnsupportedMediaType415) (return . E.encodeUtf8 . TL.toStrict) contentTypeHeader
+  contentTypeHeader <- header' "content-type"
+  contentType <- maybe (stopWith UnsupportedMediaType415) (return . E.encodeUtf8 . TL.toStrict) contentTypeHeader
 
   -- Do we have a handler for this content type? If so, run it. Alternatively, return 415.
   handlers <- contentTypesAccepted config
-  result <- fromMaybe (raise UnsupportedMediaType415) (mapContent handlers contentType)
+  result <- maybe (stopWith UnsupportedMediaType415) runHandler (mapContent handlers contentType)
 
   case result of
-       Failed                   -> status badRequest400
-       Succeeded                -> status noContent204
-       SucceededWithUrl url     -> setHeader "location" url >> status seeOther303
-       SucceededWithContent t c -> setContentTypeHeader t >> (raw . LE.encodeUtf8) c
+       Failed                   -> status' badRequest400
+       Succeeded                -> status' noContent204
+       SucceededWithUrl url     -> setHeader' "location" url >> status' seeOther303
+       SucceededWithContent t c -> setContentTypeHeader t >> ((raw' . LE.encodeUtf8) c)
 
 setContentTypeHeader :: MediaType -> RestM ()
-setContentTypeHeader = setHeader "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
+setContentTypeHeader = setHeader' "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
 
 handleExcept :: RestException -> ActionT RestException IO ()
 handleExcept MovedPermanently301     = status movedPermanently301
