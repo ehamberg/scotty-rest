@@ -27,6 +27,7 @@ import qualified Data.ByteString.Lazy as BS
 import Data.String (fromString)
 import Data.Default.Class (Default(..), def)
 import Control.Monad.State
+import Control.Monad.Reader
 
 type Url = TL.Text
 type Challenge = TL.Text
@@ -45,7 +46,7 @@ data RequestState = RequestState
 instance Default RequestState where
   def = RequestState Nothing
 
-type RestM = StateT RequestState (ActionT RestException IO)
+type RestM = ReaderT RestConfig (StateT RequestState (ActionT RestException IO))
 type Handler = ActionT RestException IO
 
 data RestConfig = RestConfig
@@ -100,32 +101,33 @@ instance ScottyError RestException where
 
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern $ do
-  let run = evalStateT (restHandlerStart config) def
+  let run = evalStateT (runReaderT restHandlerStart config) def
   run `rescue` handleExcept
 
 stopWith :: RestException -> RestM a
-stopWith = lift . raise
+stopWith = lift . lift . raise
 
 runHandler :: Handler a -> RestM a
-runHandler = lift
+runHandler = lift .lift
 
 setHeader' :: TL.Text -> TL.Text -> RestM ()
-setHeader' h v = lift $ setHeader h v
+setHeader' h v = lift . lift $ setHeader h v
 
 request' :: RestM Request
-request' = lift request
+request' = lift . lift $ request
 
 header' :: TL.Text -> RestM (Maybe TL.Text)
-header' = lift . header
+header' = lift . lift . header
 
 status' :: Status -> RestM ()
-status' = lift . status
+status' = lift . lift . status
 
 raw' :: BS.ByteString -> RestM ()
-raw' = lift .raw
+raw' = lift . lift .raw
 
-restHandlerStart :: RestConfig -> RestM ()
-restHandlerStart config = do
+restHandlerStart :: RestM ()
+restHandlerStart = do
+  config <- ask
   -- Is our service available?
   available <- serviceAvailable config
   unless available (stopWith ServiceUnavailable503)
@@ -138,7 +140,7 @@ restHandlerStart config = do
   -- Is the method allowed?
   allowed <- allowedMethods config
   when (method `notElem` allowed) $ do
-    setAllowHeader config
+    setAllowHeader
     stopWith MethodNotAllowed405
 
   -- TODO: Is the request malformed?
@@ -153,18 +155,22 @@ restHandlerStart config = do
   -- TODO: Is the entity length valid?
 
   if method == OPTIONS
-     then handleOptions config
-     else contentNegotiation method config
+     then handleOptions
+     else contentNegotiation method
 
-setAllowHeader :: RestConfig -> RestM ()
-setAllowHeader config =
+setAllowHeader :: RestM ()
+setAllowHeader = do
+  config <- ask
   setHeader' "allow" . TL.intercalate ", " . map (TL.pack . show) =<< allowedMethods config
 
-handleOptions :: RestConfig -> RestM ()
-handleOptions config = maybe (setAllowHeader config) runHandler =<< optionsHandler config
+handleOptions :: RestM ()
+handleOptions = do
+  config <- ask
+  maybe setAllowHeader runHandler =<< optionsHandler config
 
-contentNegotiation :: StdMethod -> RestConfig -> RestM ()
-contentNegotiation method config = do
+contentNegotiation :: StdMethod -> RestM ()
+contentNegotiation method = do
+  config <- ask
   -- If there is an `Accept` header, stop processing here and return a
   -- NotAcceptable406 exception if we cannot provide that type:
   accept <- return . E.encodeUtf8 . TL.toStrict . fromMaybe "*/*" =<< header' "accept"
@@ -177,28 +183,30 @@ contentNegotiation method config = do
   -- char set. If not → 406.
   -- TODO: Variances
 
-  checkResourceExists method handler config
+  checkResourceExists method handler
 
-checkResourceExists :: StdMethod -> Handler () -> RestConfig -> RestM ()
-checkResourceExists method handler config = do
+checkResourceExists :: StdMethod -> Handler () -> RestM ()
+checkResourceExists method handler = do
+  config <- ask
   exists <- resourceExists config
   if | method `elem` [GET, HEAD]        -> if exists
-                                              then handleGetHeadExisting handler config
-                                              else handleGetHeadNonExisting handler config
+                                              then handleGetHeadExisting handler
+                                              else handleGetHeadNonExisting handler
      | method `elem` [PUT, POST, PATCH] -> if exists
-                                              then handlePutPostPatchExisting method config
-                                              else handlePutPostPatchNonExisting method config
+                                              then handlePutPostPatchExisting method
+                                              else handlePutPostPatchNonExisting method
 
-handleGetHeadExisting :: Handler () -> RestConfig -> RestM ()
-handleGetHeadExisting handler _callBacks = do
+handleGetHeadExisting :: Handler () -> RestM ()
+handleGetHeadExisting handler = do
   -- TODO: generate etag
   -- TODO: last modified
   -- TODO: expires
   runHandler handler
   -- TODO: multiple choices
 
-handleGetHeadNonExisting ::  Handler () -> RestConfig -> RestM ()
-handleGetHeadNonExisting _handler config = do
+handleGetHeadNonExisting :: Handler () -> RestM ()
+handleGetHeadNonExisting _handler = do
+  config <- ask
   -- TODO: Has if match? If so: 412
 
   -- Did this resource exist before?
@@ -211,21 +219,23 @@ handleGetHeadNonExisting _handler config = do
     where moved e = \case NotMoved    -> return ()
                           MovedTo url -> setHeader' "location" url >> stopWith e
 
-handlePutPostPatchNonExisting :: StdMethod -> RestConfig -> RestM ()
-handlePutPostPatchNonExisting _method config = acceptResource config -- FIXME
+handlePutPostPatchNonExisting :: StdMethod -> RestM ()
+handlePutPostPatchNonExisting _method = acceptResource -- FIXME
 
-handlePutPostPatchExisting :: StdMethod -> RestConfig -> RestM ()
-handlePutPostPatchExisting method config = do
+handlePutPostPatchExisting :: StdMethod -> RestM ()
+handlePutPostPatchExisting method = do
+  config <- ask
   -- TODO: cond
   when (method == PUT) $ do
     conflict <- isConflict config
     when conflict (stopWith Conflict409)
 
-  acceptResource config
+  acceptResource
 
 
-acceptResource :: RestConfig -> RestM ()
-acceptResource config = do
+acceptResource :: RestM ()
+acceptResource = do
+  config <- ask
   -- Is there a Content-Type header?
   contentTypeHeader <- header' "content-type"
   contentType <- maybe (stopWith UnsupportedMediaType415) (return . E.encodeUtf8 . TL.toStrict) contentTypeHeader
