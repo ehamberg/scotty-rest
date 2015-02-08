@@ -15,7 +15,7 @@ module Web.Scotty.Rest
 ) where
 
 import Data.Maybe (fromMaybe)
-import Web.Scotty.Trans
+import Web.Scotty.Trans hiding (get)
 import Network.HTTP.Types.Method (StdMethod(..))
 import Network.HTTP.Types (parseMethod)
 import Network.HTTP.Types.Status
@@ -43,10 +43,11 @@ data Authorized = Authorized | NotAuthorized Challenge
 
 data RequestState = RequestState
   { _method :: Maybe StdMethod
+  , _handler :: Maybe (Handler ())
   }
 
 instance Default RequestState where
-  def = RequestState Nothing
+  def = RequestState Nothing Nothing
 
 newtype RestM a = RestM
   { runRestM :: ReaderT RestConfig (StateT RequestState (ActionT RestException IO)) a
@@ -141,6 +142,7 @@ restHandlerStart = do
 
   ---- Is the method known?
   method <- either (\_ -> stopWith NotImplemented501) return . parseMethod . requestMethod =<< request'
+  modify (\s -> s{_method = Just method})
 
   -- TODO: Is the URI too long?
 
@@ -163,7 +165,7 @@ restHandlerStart = do
 
   if method == OPTIONS
      then handleOptions
-     else contentNegotiation method
+     else contentNegotiation
 
 setAllowHeader :: RestM ()
 setAllowHeader = do
@@ -175,14 +177,15 @@ handleOptions = do
   config <- ask
   maybe setAllowHeader runHandler =<< optionsHandler config
 
-contentNegotiation :: StdMethod -> RestM ()
-contentNegotiation method = do
+contentNegotiation :: RestM ()
+contentNegotiation = do
   config <- ask
   -- If there is an `Accept` header, stop processing here and return a
   -- NotAcceptable406 exception if we cannot provide that type:
   accept <- return . E.encodeUtf8 . TL.toStrict . fromMaybe "*/*" =<< header' "accept"
   provided <- contentTypesProvided config
   handler <- maybe (stopWith NotAcceptable406) return (mapAccept provided accept)
+  modify (\s -> s{_handler = Just handler})
 
   -- TODO: If there is an `Accept-Language` header, check that we provide that
   -- language. If not → 406.
@@ -190,29 +193,31 @@ contentNegotiation method = do
   -- char set. If not → 406.
   -- TODO: Variances
 
-  checkResourceExists method handler
+  checkResourceExists
 
-checkResourceExists :: StdMethod -> Handler () -> RestM ()
-checkResourceExists method handler = do
+checkResourceExists :: RestM ()
+checkResourceExists = do
   config <- ask
+  method <- getCached _method
   exists <- resourceExists config
   if | method `elem` [GET, HEAD]        -> if exists
-                                              then handleGetHeadExisting handler
-                                              else handleGetHeadNonExisting handler
+                                              then handleGetHeadExisting
+                                              else handleGetHeadNonExisting
      | method `elem` [PUT, POST, PATCH] -> if exists
-                                              then handlePutPostPatchExisting method
-                                              else handlePutPostPatchNonExisting method
+                                              then handlePutPostPatchExisting
+                                              else handlePutPostPatchNonExisting
 
-handleGetHeadExisting :: Handler () -> RestM ()
-handleGetHeadExisting handler = do
+handleGetHeadExisting :: RestM ()
+handleGetHeadExisting = do
   -- TODO: generate etag
   -- TODO: last modified
   -- TODO: expires
+  handler <- getCached _handler
   runHandler handler
   -- TODO: multiple choices
 
-handleGetHeadNonExisting :: Handler () -> RestM ()
-handleGetHeadNonExisting _handler = do
+handleGetHeadNonExisting :: RestM ()
+handleGetHeadNonExisting = do
   config <- ask
   -- TODO: Has if match? If so: 412
 
@@ -226,12 +231,13 @@ handleGetHeadNonExisting _handler = do
     where moved e = \case NotMoved    -> return ()
                           MovedTo url -> setHeader' "location" url >> stopWith e
 
-handlePutPostPatchNonExisting :: StdMethod -> RestM ()
-handlePutPostPatchNonExisting _method = acceptResource -- FIXME
+handlePutPostPatchNonExisting :: RestM ()
+handlePutPostPatchNonExisting = acceptResource -- FIXME
 
-handlePutPostPatchExisting :: StdMethod -> RestM ()
-handlePutPostPatchExisting method = do
+handlePutPostPatchExisting :: RestM ()
+handlePutPostPatchExisting = do
   config <- ask
+  method <- getCached _method
   -- TODO: cond
   when (method == PUT) $ do
     conflict <- isConflict config
@@ -259,6 +265,11 @@ acceptResource = do
 
 setContentTypeHeader :: MediaType -> RestM ()
 setContentTypeHeader = setHeader' "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
+
+getCached :: (RequestState -> Maybe b) -> RestM b
+getCached accessor = liftM accessor get >>= \case
+  Just v  -> return v
+  Nothing -> stopWith (InternalServerError "Cached state variable missing")
 
 handleExcept :: RestException -> ActionT RestException IO ()
 handleExcept MovedPermanently301     = status movedPermanently301
