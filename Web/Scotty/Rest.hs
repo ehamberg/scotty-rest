@@ -5,15 +5,18 @@
 {-# Language RankNTypes #-}
 
 module Web.Scotty.Rest
-( RestConfig(..)
-, RestException(..)
-, ProcessingResult(..)
-, Authorized(..)
-, Moved(..)
-, defaultConfig
-, rest
-, StdMethod(..)
-) where
+  (
+  -- * REST handler to Scotty
+    rest
+  -- * Callback result types
+  , ProcessingResult(..)
+  , Authorized(..) , Moved(..)
+  -- * Config
+  , RestConfig(..)
+  , defaultConfig
+  -- * Re-exports
+  , StdMethod(..)
+  ) where
 
 import Data.Maybe (fromMaybe)
 import Web.Scotty.Trans hiding (get)
