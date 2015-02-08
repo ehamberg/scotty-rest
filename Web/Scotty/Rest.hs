@@ -2,6 +2,7 @@
 {-# Language OverloadedStrings #-}
 {-# Language LambdaCase #-}
 {-# Language MultiWayIf #-}
+{-# Language RankNTypes #-}
 
 module Web.Scotty.Rest
 ( RestConfig(..)
@@ -30,6 +31,8 @@ import Data.Default.Class (Default(..), def)
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Reader
+import Lens.Family2
+import Lens.Family2.State
 
 newtype RestM a = RestM
   { runRestM :: ReaderT RestConfig (StateT RequestState (ActionT RestException IO)) a
@@ -48,11 +51,14 @@ data ProcessingResult = Succeeded
 data Authorized = Authorized | NotAuthorized Challenge
 
 data RequestState = RequestState
-  { _method :: Maybe StdMethod
-  , _handler :: Maybe (Handler ())
-  }
+                      (Maybe StdMethod)
+                      (Maybe (Handler ()))
 
+methodL :: Lens' RequestState (Maybe StdMethod)
+methodL f (RequestState m h) = (\m' -> RequestState m' h) `fmap` (f m)
 
+handlerL :: Lens' RequestState (Maybe (Handler ()))
+handlerL f (RequestState m h) = (\h' -> RequestState m h') `fmap` (f h)
 
 instance Default RequestState where
   def = RequestState Nothing Nothing
@@ -144,7 +150,7 @@ restHandlerStart = do
 
   ---- Is the method known?
   method <- either (\_ -> stopWith NotImplemented501) return . parseMethod . requestMethod =<< request'
-  modify (\s -> s{_method = Just method})
+  methodL .= (Just method)
 
   -- TODO: Is the URI too long?
 
@@ -187,7 +193,7 @@ contentNegotiation = do
   accept <- return . E.encodeUtf8 . TL.toStrict . fromMaybe "*/*" =<< header' "accept"
   provided <- contentTypesProvided config
   handler <- maybe (stopWith NotAcceptable406) return (mapAccept provided accept)
-  modify (\s -> s{_handler = Just handler})
+  handlerL .= Just handler
 
   -- TODO: If there is an `Accept-Language` header, check that we provide that
   -- language. If not → 406.
@@ -200,7 +206,7 @@ contentNegotiation = do
 checkResourceExists :: RestM ()
 checkResourceExists = do
   config <- ask
-  method <- getCached _method
+  method <- getCached methodL
   exists <- resourceExists config
   if | method `elem` [GET, HEAD]        -> if exists
                                               then handleGetHeadExisting
@@ -214,7 +220,7 @@ handleGetHeadExisting = do
   -- TODO: generate etag
   -- TODO: last modified
   -- TODO: expires
-  handler <- getCached _handler
+  handler <- getCached handlerL
   runHandler handler
   -- TODO: multiple choices
 
@@ -239,7 +245,7 @@ handlePutPostPatchNonExisting = acceptResource -- FIXME
 handlePutPostPatchExisting :: RestM ()
 handlePutPostPatchExisting = do
   config <- ask
-  method <- getCached _method
+  method <- getCached methodL
   -- TODO: cond
   when (method == PUT) $ do
     conflict <- isConflict config
@@ -268,8 +274,8 @@ acceptResource = do
 setContentTypeHeader :: MediaType -> RestM ()
 setContentTypeHeader = setHeader' "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
 
-getCached :: (RequestState -> Maybe b) -> RestM b
-getCached accessor = liftM accessor get >>= \case
+getCached :: Lens' RequestState (Maybe a) -> RestM a
+getCached lens = use lens >>= \case
   Just v  -> return v
   Nothing -> stopWith (InternalServerError "Cached state variable missing")
 
