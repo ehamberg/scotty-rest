@@ -255,7 +255,7 @@ acceptResource = do
        Failed                   -> status' badRequest400
        Succeeded                -> status' noContent204
        SucceededWithUrl url     -> setHeader' "location" url >> status' seeOther303
-       SucceededWithContent t c -> setContentTypeHeader t >> ((raw' . LE.encodeUtf8) c)
+       SucceededWithContent t c -> setContentTypeHeader t >> (raw' . LE.encodeUtf8) c
 
 setContentTypeHeader :: MediaType -> RestM ()
 setContentTypeHeader = setHeader' "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
