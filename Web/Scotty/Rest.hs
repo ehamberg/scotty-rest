@@ -31,6 +31,12 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Reader
 
+newtype RestM a = RestM
+  { runRestM :: ReaderT RestConfig (StateT RequestState (ActionT RestException IO)) a
+  } deriving (Functor, Applicative, Monad, MonadIO, MonadState RequestState, MonadReader RestConfig)
+
+type Handler = ActionT RestException IO
+
 type Url = TL.Text
 type Challenge = TL.Text
 
@@ -46,14 +52,10 @@ data RequestState = RequestState
   , _handler :: Maybe (Handler ())
   }
 
+
+
 instance Default RequestState where
   def = RequestState Nothing Nothing
-
-newtype RestM a = RestM
-  { runRestM :: ReaderT RestConfig (StateT RequestState (ActionT RestException IO)) a
-  } deriving (Functor, Applicative, Monad, MonadIO, MonadState RequestState, MonadReader RestConfig)
-
-type Handler = ActionT RestException IO
 
 data RestConfig = RestConfig
   { allowedMethods       :: RestM [StdMethod]
