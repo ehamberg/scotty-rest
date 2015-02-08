@@ -14,10 +14,12 @@ category:            Web
 build-type:          Simple
 cabal-version:       >=1.10
 description:
-  Webmachine-like REST library for [Scotty](http://hackage.haskell.org/package/scotty).
+  Webmachine-like REST library for Scotty.
 
 extra-source-files:
     examples/HelloWorld.hs
+    examples/Parameters.hs
+    examples/Database.hs
 
 library
   Exposed-modules:     Web.Scotty.Rest
@@ -29,16 +31,12 @@ library
                , http-types         >= 0.8   && < 0.9
                , lens-family        >= 1.2   && < 1.3
                , lens-family-core   >= 1.2   && < 1.3
+               , mtl                >= 2.1   && < 2.2
                , scotty             >= 0.9   && < 1.0
                , text               >= 1.2   && < 1.3
                , transformers       >= 0.3   && < 0.4
                , wai                >= 3.0   && < 3.1
                , wai-extra          >= 3.0   && < 3.1
-               -- for examples:
-               , sqlite-simple
-               , mtl
-               , warp
-               , aeson
   default-language:    Haskell2010
   GHC-options: -Wall
 
