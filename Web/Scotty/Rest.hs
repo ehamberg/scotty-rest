@@ -1,3 +1,4 @@
+{-# Language GeneralizedNewtypeDeriving #-}
 {-# Language OverloadedStrings #-}
 {-# Language LambdaCase #-}
 {-# Language MultiWayIf #-}
@@ -26,6 +27,7 @@ import Network.Wai (Request, requestMethod)
 import qualified Data.ByteString.Lazy as BS
 import Data.String (fromString)
 import Data.Default.Class (Default(..), def)
+import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Reader
 
@@ -46,7 +48,10 @@ data RequestState = RequestState
 instance Default RequestState where
   def = RequestState Nothing
 
-type RestM = ReaderT RestConfig (StateT RequestState (ActionT RestException IO))
+newtype RestM a = RestM
+  { runRestM :: ReaderT RestConfig (StateT RequestState (ActionT RestException IO)) a
+  } deriving (Functor, Applicative, Monad, MonadIO, MonadState RequestState, MonadReader RestConfig)
+
 type Handler = ActionT RestException IO
 
 data RestConfig = RestConfig
@@ -103,29 +108,29 @@ defaultConfig = def
 
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern $ do
-  let run = evalStateT (runReaderT restHandlerStart config) def
+  let run = evalStateT (runReaderT (runRestM restHandlerStart) config) def
   run `rescue` handleExcept
 
 stopWith :: RestException -> RestM a
-stopWith = lift . lift . raise
+stopWith = RestM . lift . lift . raise
 
 runHandler :: Handler a -> RestM a
-runHandler = lift .lift
+runHandler = RestM . lift .lift
 
 setHeader' :: TL.Text -> TL.Text -> RestM ()
-setHeader' h v = lift . lift $ setHeader h v
+setHeader' h v = RestM . lift . lift $ setHeader h v
 
 request' :: RestM Request
-request' = lift . lift $ request
+request' = RestM . lift . lift $ request
 
 header' :: TL.Text -> RestM (Maybe TL.Text)
-header' = lift . lift . header
+header' = RestM . lift . lift . header
 
 status' :: Status -> RestM ()
-status' = lift . lift . status
+status' = RestM . lift . lift . status
 
 raw' :: BS.ByteString -> RestM ()
-raw' = lift . lift .raw
+raw' = RestM . lift . lift .raw
 
 restHandlerStart :: RestM ()
 restHandlerStart = do
