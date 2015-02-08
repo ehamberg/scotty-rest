@@ -19,7 +19,7 @@ module Web.Scotty.Rest
   ) where
 
 import Data.Maybe (fromMaybe)
-import Web.Scotty.Trans hiding (get)
+import Web.Scotty.Trans
 import Network.HTTP.Types.Method (StdMethod(..))
 import Network.HTTP.Types (parseMethod)
 import Network.HTTP.Types.Status
@@ -32,7 +32,7 @@ import qualified Data.ByteString.Lazy as BS
 import Data.String (fromString)
 import Data.Default.Class (Default(..), def)
 import Control.Applicative
-import Control.Monad.State
+import Control.Monad.State (evalStateT)
 import Control.Monad.Reader
 import Lens.Family2
 import Lens.Family2.State
