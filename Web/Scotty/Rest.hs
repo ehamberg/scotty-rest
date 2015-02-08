@@ -118,6 +118,14 @@ instance ScottyError RestException where
 defaultConfig :: RestConfig
 defaultConfig = def
 
+-- | /rest/ is used where you would use e.g. 'get' in your Scotty app, and
+-- will match any method:
+--
+-- > main = scotty 3000 $ do
+-- >   get  "/foo" (text "Hello!")
+-- >   rest "/bar" defaultConfig {
+-- >       contentTypesProvided = return [("text/html",html "Hello, World!")]
+-- >     }
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern $ do
   let run = evalStateT (runReaderT (runRestM restHandlerStart) config) def
