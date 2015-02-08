@@ -57,14 +57,15 @@ data RequestState = RequestState
                       (Maybe StdMethod)
                       (Maybe (Handler ()))
 
-methodL :: Lens' RequestState (Maybe StdMethod)
-methodL f (RequestState m h) = (\m' -> RequestState m' h) `fmap` (f m)
-
-handlerL :: Lens' RequestState (Maybe (Handler ()))
-handlerL f (RequestState m h) = (\h' -> RequestState m h') `fmap` (f h)
-
 instance Default RequestState where
   def = RequestState Nothing Nothing
+
+-- Lenses for RequestState's fields:
+method' :: Lens' RequestState (Maybe StdMethod)
+method' f (RequestState m h) = (`RequestState` h) `fmap` f m
+
+handler' :: Lens' RequestState (Maybe (Handler ()))
+handler' f (RequestState m h) = RequestState m `fmap` f h
 
 data RestConfig = RestConfig
   { allowedMethods       :: RestM [StdMethod]
@@ -159,9 +160,9 @@ restHandlerStart = do
   available <- serviceAvailable config
   unless available (stopWith ServiceUnavailable503)
 
-  ---- Is the method known?
+  -- Is the method known?
   method <- either (\_ -> stopWith NotImplemented501) return . parseMethod . requestMethod =<< request'
-  methodL .= (Just method)
+  method' .= Just method
 
   -- TODO: Is the URI too long?
 
@@ -199,12 +200,14 @@ handleOptions = do
 contentNegotiation :: RestM ()
 contentNegotiation = do
   config <- ask
-  -- If there is an `Accept` header, stop processing here and return a
-  -- NotAcceptable406 exception if we cannot provide that type:
+  -- If there is an `Accept` header...
   accept <- return . E.encodeUtf8 . TL.toStrict . fromMaybe "*/*" =<< header' "accept"
+  -- ... look at the content types we provide and find and store the best
+  -- handler. If we cannot provide that type, stop processing here and return a
+  -- NotAcceptable406:
   provided <- contentTypesProvided config
   handler <- maybe (stopWith NotAcceptable406) return (mapAccept provided accept)
-  handlerL .= Just handler
+  handler' .= Just handler
 
   -- TODO: If there is an `Accept-Language` header, check that we provide that
   -- language. If not → 406.
@@ -217,7 +220,7 @@ contentNegotiation = do
 checkResourceExists :: RestM ()
 checkResourceExists = do
   config <- ask
-  method <- getCached methodL
+  method <- fromCache method'
   exists <- resourceExists config
   if | method `elem` [GET, HEAD]        -> if exists
                                               then handleGetHeadExisting
@@ -231,8 +234,7 @@ handleGetHeadExisting = do
   -- TODO: generate etag
   -- TODO: last modified
   -- TODO: expires
-  handler <- getCached handlerL
-  runHandler handler
+  fromCache handler' >>= runHandler
   -- TODO: multiple choices
 
 handleGetHeadNonExisting :: RestM ()
@@ -256,8 +258,8 @@ handlePutPostPatchNonExisting = acceptResource -- FIXME
 handlePutPostPatchExisting :: RestM ()
 handlePutPostPatchExisting = do
   config <- ask
-  method <- getCached methodL
   -- TODO: cond
+  method <- fromCache method'
   when (method == PUT) $ do
     conflict <- isConflict config
     when conflict (stopWith Conflict409)
@@ -285,8 +287,8 @@ acceptResource = do
 setContentTypeHeader :: MediaType -> RestM ()
 setContentTypeHeader = setHeader' "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
 
-getCached :: Lens' RequestState (Maybe a) -> RestM a
-getCached lens = use lens >>= \case
+fromCache :: Lens' RequestState (Maybe a) -> RestM a
+fromCache lens = use lens >>= \case
   Just v  -> return v
   Nothing -> stopWith (InternalServerError "Cached state variable missing")
 
