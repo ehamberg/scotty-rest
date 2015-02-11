@@ -1,5 +1,6 @@
 {-# Language GeneralizedNewtypeDeriving #-}
 {-# Language TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Web.Scotty.Rest.Types
   (
