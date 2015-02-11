@@ -3,6 +3,7 @@
 {-# Language LambdaCase #-}
 {-# Language MultiWayIf #-}
 {-# Language RankNTypes #-}
+{-# Language TemplateHaskell #-}
 
 module Web.Scotty.Rest
   (
@@ -37,6 +38,7 @@ import Control.Applicative
 import Control.Monad.State (evalStateT)
 import Control.Monad.Reader
 import Lens.Family2
+import Lens.Family2.TH (makeLensesBy)
 import Lens.Family2.State
 
 newtype RestM a = RestM
@@ -49,6 +51,8 @@ type Url = TL.Text
 type Challenge = TL.Text
 
 data Moved = NotMoved | MovedTo Url
+data ETag = Strong TL.Text
+          | Weak TL.Text
 data ProcessingResult = Succeeded
                       | SucceededWithContent MediaType TL.Text
                       | SucceededSeeOther Url
@@ -60,34 +64,16 @@ data DeleteResult = NotDeleted
                   deriving Eq
 data Authorized = Authorized | NotAuthorized Challenge
 
-data RequestState = RequestState
-                      (Maybe StdMethod)       -- Method
-                      (Maybe (Handler ()))    -- Handler found
-                      (Maybe Bool)            -- New resource?
-                      (Maybe (Maybe ETag))    -- ETag, if computed
-                      (Maybe (Maybe UTCTime)) -- Last modified, if computed
-
 instance Default RequestState where
   def = RequestState def def def def def
 
-data ETag = Strong TL.Text
-          | Weak TL.Text
-
--- Lenses for RequestState's fields:
-method' :: Lens' RequestState (Maybe StdMethod)
-method' f (RequestState m h r e l) = (\m' -> RequestState m' h r e l) `fmap` f m
-
-handler' :: Lens' RequestState (Maybe (Handler ()))
-handler' f (RequestState m h r e l) = (\h' -> RequestState m h' r e l) `fmap` f h
-
-newResource' :: Lens' RequestState (Maybe Bool)
-newResource' f (RequestState m h r e l) = (\r' -> RequestState m h r' e l) `fmap` f r
-
-eTag' :: Lens' RequestState (Maybe (Maybe ETag))
-eTag' f (RequestState m h r e l) = (\e' -> RequestState m h r e' l) `fmap` f e
-
-lastModified' :: Lens' RequestState (Maybe (Maybe UTCTime))
-lastModified' f (RequestState m h r e l) = (\l' -> RequestState m h r e l') `fmap` f l
+data RequestState = RequestState
+  { _method      :: (Maybe StdMethod)       -- Method
+  , _handler     :: (Maybe (Handler ()))    -- Handler found
+  , _newResource :: (Maybe Bool)            -- New resource?
+  , _eTag        :: (Maybe (Maybe ETag))    -- ETag, if computed
+  , _lastModified :: (Maybe (Maybe UTCTime)) -- Last modified, if computed
+  }
 
 data RestConfig = RestConfig
   { allowedMethods       :: RestM [StdMethod]
@@ -150,6 +136,8 @@ data RestException = MovedPermanently301
 instance ScottyError RestException where
   stringError = InternalServerError . TL.pack
   showError = fromString . show
+
+$(makeLensesBy (\n -> Just ((tail n) ++ "'")) ''RequestState)
 
 defaultConfig :: RestConfig
 defaultConfig = def
