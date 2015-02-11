@@ -19,7 +19,9 @@ module Web.Scotty.Rest
   ) where
 
 import Data.Maybe (fromMaybe)
+import Data.Time.Clock (UTCTime)
 import Web.Scotty.Trans
+import Network.HTTP.Date
 import Network.HTTP.Types.Method (StdMethod(..))
 import Network.HTTP.Types (parseMethod)
 import Network.HTTP.Types.Status
@@ -49,23 +51,43 @@ type Challenge = TL.Text
 data Moved = NotMoved | MovedTo Url
 data ProcessingResult = Succeeded
                       | SucceededWithContent MediaType TL.Text
-                      | SucceededWithUrl Url
+                      | SucceededSeeOther Url
+                      | SucceededWithLocation Url
                       | Failed
+data DeleteResult = NotDeleted
+                  | Deleted
+                  | DeletedWithContent MediaType TL.Text
+                  deriving Eq
 data Authorized = Authorized | NotAuthorized Challenge
 
 data RequestState = RequestState
-                      (Maybe StdMethod)
-                      (Maybe (Handler ()))
+                      (Maybe StdMethod)       -- Method
+                      (Maybe (Handler ()))    -- Handler found
+                      (Maybe Bool)            -- New resource?
+                      (Maybe (Maybe ETag))    -- ETag, if computed
+                      (Maybe (Maybe UTCTime)) -- Last modified, if computed
 
 instance Default RequestState where
-  def = RequestState Nothing Nothing
+  def = RequestState def def def def def
+
+data ETag = Strong TL.Text
+          | Weak TL.Text
 
 -- Lenses for RequestState's fields:
 method' :: Lens' RequestState (Maybe StdMethod)
-method' f (RequestState m h) = (`RequestState` h) `fmap` f m
+method' f (RequestState m h r e l) = (\m' -> RequestState m' h r e l) `fmap` f m
 
 handler' :: Lens' RequestState (Maybe (Handler ()))
-handler' f (RequestState m h) = RequestState m `fmap` f h
+handler' f (RequestState m h r e l) = (\h' -> RequestState m h' r e l) `fmap` f h
+
+newResource' :: Lens' RequestState (Maybe Bool)
+newResource' f (RequestState m h r e l) = (\r' -> RequestState m h r' e l) `fmap` f r
+
+eTag' :: Lens' RequestState (Maybe (Maybe ETag))
+eTag' f (RequestState m h r e l) = (\e' -> RequestState m h r e' l) `fmap` f e
+
+lastModified' :: Lens' RequestState (Maybe (Maybe UTCTime))
+lastModified' f (RequestState m h r e l) = (\l' -> RequestState m h r e l') `fmap` f l
 
 data RestConfig = RestConfig
   { allowedMethods       :: RestM [StdMethod]
@@ -74,10 +96,16 @@ data RestConfig = RestConfig
   , isConflict           :: RestM Bool
   , contentTypesAccepted :: RestM [(MediaType, Handler ProcessingResult)]
   , contentTypesProvided :: RestM [(MediaType, Handler ())]
+  , deleteResource       :: RestM DeleteResult
+  , deleteCompleted      :: RestM Bool
   , optionsHandler       :: RestM (Maybe (Handler ()))
   , charSetsProvided     :: RestM (Maybe [TL.Text])
+  , generateEtag         :: RestM (Maybe ETag)
+  , lastModified         :: RestM (Maybe UTCTime)
   , isAuthorized         :: RestM Authorized
   , serviceAvailable     :: RestM Bool
+  , allowMissingPost     :: RestM Bool
+  , multipleChoices      :: RestM Bool
   , movedPermanently     :: RestM Moved
   , movedTemporarily     :: RestM Moved
   }
@@ -89,10 +117,16 @@ instance Default RestConfig where
                   , isConflict           = return False
                   , contentTypesAccepted = return []
                   , contentTypesProvided = return []
+                  , deleteResource       = return NotDeleted
+                  , deleteCompleted      = return True
                   , optionsHandler       = return Nothing
                   , charSetsProvided     = return Nothing
+                  , generateEtag         = return Nothing
+                  , lastModified         = return Nothing
                   , isAuthorized         = return Authorized
                   , serviceAvailable     = return True
+                  , allowMissingPost     = return True
+                  , multipleChoices      = return False
                   , movedPermanently     = return NotMoved
                   , movedTemporarily     = return NotMoved
                   }
@@ -105,6 +139,7 @@ data RestException = MovedPermanently301
                    | NotAcceptable406
                    | Conflict409
                    | Gone410
+                   | PreconditionFailed412
                    | UnsupportedMediaType415
                    | NotImplemented501
                    | ServiceUnavailable503
@@ -192,10 +227,18 @@ setAllowHeader = do
   config <- ask
   setHeader' "allow" . TL.intercalate ", " . map (TL.pack . show) =<< allowedMethods config
 
+--------------------------------------------------------------------------------
+-- OPTIONS
+--------------------------------------------------------------------------------
+
 handleOptions :: RestM ()
 handleOptions = do
   config <- ask
   maybe setAllowHeader runHandler =<< optionsHandler config
+
+--------------------------------------------------------------------------------
+-- Content negotiation
+--------------------------------------------------------------------------------
 
 contentNegotiation :: RestM ()
 contentNegotiation = do
@@ -228,9 +271,16 @@ checkResourceExists = do
      | method `elem` [PUT, POST, PATCH] -> if exists
                                               then handlePutPostPatchExisting
                                               else handlePutPostPatchNonExisting
+     | method `elem` [DELETE]           -> if exists
+                                              then handleDeleteExisting
+                                              else handleDeleteNonExisting
+
+--------------------------------------------------------------------------------
+-- GET/HEAD
+--------------------------------------------------------------------------------
 
 handleGetHeadExisting :: RestM ()
-handleGetHeadExisting = do
+handleGetHeadExisting =
   -- TODO: generate etag
   -- TODO: last modified
   -- TODO: expires
@@ -246,19 +296,51 @@ handleGetHeadNonExisting = do
   existed <- previouslyExisted config
   unless existed (stopWith NotFound404)
 
-  movedPermanently config >>= moved MovedPermanently301
-  movedTemporarily config >>= moved MovedTemporarily307
+  moved
   stopWith Gone410
-    where moved e = \case NotMoved    -> return ()
-                          MovedTo url -> setHeader' "location" url >> stopWith e
+
+moved :: RestM ()
+moved = do
+  config <- ask
+  movedPermanently config >>= moved' MovedPermanently301
+  movedTemporarily config >>= moved' MovedTemporarily307
+    where moved' _ NotMoved      = return ()
+          moved' e (MovedTo url) = setHeader' "location" url >> stopWith e
+
+--------------------------------------------------------------------------------
+-- PUT/POST/PATCH
+--------------------------------------------------------------------------------
 
 handlePutPostPatchNonExisting :: RestM ()
-handlePutPostPatchNonExisting = acceptResource -- FIXME
+handlePutPostPatchNonExisting =
+  -- TODO: has if-match?
+  methodIs [POST, PATCH] ppppreviouslyExisted pppmethodIsPut
+
+ppppreviouslyExisted :: RestM ()
+ppppreviouslyExisted = do
+  config <- ask
+  existed <- previouslyExisted config
+  if existed
+     then pppmovedPermanently
+     else pppmethodIsPost
+
+pppmovedPermanently :: RestM ()
+pppmovedPermanently = do
+  moved
+  methodIs [POST] (allowsMissingPost acceptResource (stopWith Gone410)) pppmethodIsPut
+
+pppmethodIsPost :: RestM ()
+pppmethodIsPost = methodIs [POST] pppmethodIsPut (stopWith NotFound404)
+
+pppmethodIsPut :: RestM ()
+pppmethodIsPut = methodIs [PUT]
+    (ask >>= (isConflict >=> (\conflict -> if conflict then stopWith Conflict409 else acceptResource)))
+    acceptResource
 
 handlePutPostPatchExisting :: RestM ()
 handlePutPostPatchExisting = do
   config <- ask
-  -- TODO: cond
+  cond
   method <- fromCache method'
   when (method == PUT) $ do
     conflict <- isConflict config
@@ -266,6 +348,9 @@ handlePutPostPatchExisting = do
 
   acceptResource
 
+--------------------------------------------------------------------------------
+-- POST/PUT/PATCH, part 2: content-types accepted
+--------------------------------------------------------------------------------
 
 acceptResource :: RestM ()
 acceptResource = do
@@ -279,13 +364,139 @@ acceptResource = do
   result <- maybe (stopWith UnsupportedMediaType415) runHandler (mapContent handlers contentType)
 
   case result of
-       Failed                   -> status' badRequest400
-       Succeeded                -> status' noContent204
-       SucceededWithUrl url     -> setHeader' "location" url >> status' seeOther303
-       SucceededWithContent t c -> setContentTypeHeader t >> (raw' . LE.encodeUtf8) c
+       Failed                    -> status' badRequest400
+       Succeeded                 -> status' noContent204
+       SucceededSeeOther url     -> resourceSeeOther url
+       SucceededWithLocation url -> resourceWithLocation url
+       SucceededWithContent t c  -> resourceWithContent t c
+
+resourceSeeOther :: Url -> RestM ()
+resourceSeeOther url = do
+  newResource <- fromCache newResource'
+  if newResource
+     then status' created201
+     else setHeader' "location" url >> status' seeOther303
+
+resourceWithLocation :: Url -> RestM ()
+resourceWithLocation url = do
+  newResource <- fromCache newResource'
+  if newResource
+     then do setHeader' "location" url
+             status' created201
+     else status' noContent204
+
+-- C
+resourceWithContent :: MediaType -> TL.Text -> RestM ()
+resourceWithContent t c = do
+  config <- ask
+  setContentTypeHeader t
+  (raw' . LE.encodeUtf8) c
+  multiple <- multipleChoices config
+  if multiple
+     then status' multipleChoices300
+     else status' ok200
+
+--------------------------------------------------------------------------------
+-- DELETE
+--------------------------------------------------------------------------------
+
+handleDeleteExisting :: RestM ()
+handleDeleteExisting = do
+  config <- ask
+  cond
+  result <- deleteResource config
+  when (result == NotDeleted) (stopWith (InternalServerError "Could not delete resource"))
+  completed <- deleteCompleted config
+  case (result,completed) of
+       (Deleted,False)            -> status' accepted202
+       (Deleted,True)             -> status' noContent204
+       (DeletedWithContent t c,_) -> resourceWithContent t c
+       _                          -> stopWith (InternalServerError "“Impossible” state")
+
+handleDeleteNonExisting :: RestM ()
+handleDeleteNonExisting = do
+  config <- ask
+  -- TODO: has if-match?
+  existed <- previouslyExisted config
+  unless existed (stopWith NotFound404)
+  moved
+  stopWith Gone410
+
+--------------------------------------------------------------------------------
+-- Conditional requests
+--------------------------------------------------------------------------------
+
+cond :: RestM ()
+cond = condIfMatch
+
+condIfMatch :: RestM ()
+condIfMatch = do
+  im <- header' "if-match"
+  case im of
+       Nothing -> condIfUnmodifiedSince
+       Just m  -> eTagMatches m condIfUnmodifiedSince (stopWith PreconditionFailed412)
+
+condIfUnmodifiedSince :: RestM ()
+condIfUnmodifiedSince = do
+  im <- header' "if-unmodified-since"
+  case im of
+       Nothing -> condIfNoneMatch
+       Just m  -> isModifiedSince m condIfNoneMatch (stopWith PreconditionFailed412)
+
+condIfNoneMatch :: RestM ()
+condIfNoneMatch = return () -- TODO
+
+--------------------------------------------------------------------------------
+-- Helpers
+--------------------------------------------------------------------------------
 
 setContentTypeHeader :: MediaType -> RestM ()
 setContentTypeHeader = setHeader' "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
+
+methodIs :: [StdMethod] -> RestM () -> RestM () -> RestM ()
+methodIs ms onTrue onFalse = do
+  m <- fromCache method'
+  if m `elem` ms
+     then onTrue
+     else onFalse
+
+allowsMissingPost :: RestM () -> RestM () -> RestM ()
+allowsMissingPost onTrue onFalse = do
+  config <- ask
+  allowed <- allowMissingPost config
+  if allowed
+     then newResource' .= Just True >> onTrue
+     else onFalse
+
+eTagMatches :: TL.Text -> RestM () -> RestM () -> RestM ()
+eTagMatches given onTrue onFalse = do
+  eTag <- use eTag' >>= \case Just e  -> return e
+                              Nothing -> do config <- ask
+                                            tag <- generateEtag config
+                                            eTag' .= Just tag
+                                            return tag
+  case eTag of
+       Nothing -> onFalse
+       Just e  -> if eTagMatch e given
+                     then onTrue
+                     else onFalse
+    where eTagMatch :: ETag -> TL.Text -> Bool
+          eTagMatch = undefined
+
+isModifiedSince :: TL.Text -> RestM () -> RestM () -> RestM ()
+isModifiedSince given onTrue onFalse = do
+  modified <- use lastModified' >>= \case Just e  -> return e
+                                          Nothing -> do config <- ask
+                                                        date <- lastModified config
+                                                        lastModified' .= Just date
+                                                        return date
+  case modified of
+       Nothing -> onFalse
+       Just d  -> if modifiedSince d given
+                     then onTrue
+                     else onFalse
+    where modifiedSince :: UTCTime -> TL.Text -> Bool
+          modifiedSince = undefined
 
 fromCache :: Lens' RequestState (Maybe a) -> RestM a
 fromCache lens = use lens >>= \case
@@ -303,6 +514,7 @@ handleExcept NotAcceptable406        = status notAcceptable406
 handleExcept Conflict409             = status conflict409
 handleExcept UnsupportedMediaType415 = status unsupportedMediaType415
 handleExcept Gone410                 = status gone410
+handleExcept PreconditionFailed412   = status preconditionFailed412
 handleExcept ServiceUnavailable503   = status serviceUnavailable503
 handleExcept NotImplemented501       = status notImplemented501
 handleExcept (InternalServerError s) = text s >> status internalServerError500
