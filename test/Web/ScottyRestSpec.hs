@@ -16,7 +16,6 @@ import Web.Scotty.Rest (RestConfig(..), StdMethod(..))
 import Control.Monad (liftM)
 import Data.ByteString.Char8 (pack)
 import Data.Text.Lazy.Encoding (decodeUtf8)
-import Network.Wai (Application)
 
 instance Arbitrary Rest.StdMethod where
   arbitrary = elements (enumFromTo minBound maxBound)
@@ -24,11 +23,10 @@ instance Arbitrary Rest.StdMethod where
 main :: IO ()
 main = hspec spec
 
-withApp :: ScottyT e IO () -> SpecWith Application -> Spec
-withApp = with . scottyAppT id id
-
 spec :: Spec
 spec = do
+  let withApp = with . scottyAppT id id
+
   describe "HTTP" $ do
     describe "503 Not available" $
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $
