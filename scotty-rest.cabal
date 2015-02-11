@@ -22,7 +22,8 @@ extra-source-files:
     examples/Database.hs
 
 library
-  Exposed-modules:     Web.Scotty.Rest
+  Exposed-modules: Web.Scotty.Rest
+                 , Web.Scotty.Rest.Types
 
   build-depends: base               >= 4.7   && < 4.8
                , bytestring         >= 0.10  && < 0.11
