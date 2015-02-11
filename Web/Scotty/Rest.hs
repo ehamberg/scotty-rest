@@ -1,9 +1,6 @@
-{-# Language GeneralizedNewtypeDeriving #-}
 {-# Language OverloadedStrings #-}
 {-# Language LambdaCase #-}
 {-# Language MultiWayIf #-}
-{-# Language RankNTypes #-}
-{-# Language TemplateHaskell #-}
 
 module Web.Scotty.Rest
   (
@@ -19,125 +16,25 @@ module Web.Scotty.Rest
   , StdMethod(..)
   ) where
 
+import Web.Scotty.Rest.Types
+
 import Data.Maybe (fromMaybe)
-import Data.Time.Clock (UTCTime)
 import Web.Scotty.Trans
 import Network.HTTP.Date
-import Network.HTTP.Types.Method (StdMethod(..))
 import Network.HTTP.Types (parseMethod)
 import Network.HTTP.Types.Status
-import Network.HTTP.Media (MediaType, mapAccept, mapContent, renderHeader)
+import Network.HTTP.Media (mapAccept, mapContent, renderHeader)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as E
 import qualified Data.Text.Lazy.Encoding as LE
 import Network.Wai (Request, requestMethod)
 import qualified Data.ByteString.Lazy as BS
-import Data.String (fromString)
 import Data.Default.Class (Default(..), def)
-import Control.Applicative
+import Control.Monad ((>=>), unless, when)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.State (evalStateT)
-import Control.Monad.Reader
-import Lens.Family2
-import Lens.Family2.TH (makeLensesBy)
+import Control.Monad.Reader (runReaderT, ask)
 import Lens.Family2.State
-
-newtype RestM a = RestM
-  { runRestM :: ReaderT RestConfig (StateT RequestState (ActionT RestException IO)) a
-  } deriving (Functor, Applicative, Monad, MonadIO, MonadState RequestState, MonadReader RestConfig)
-
-type Handler = ActionT RestException IO
-
-type Url = TL.Text
-type Challenge = TL.Text
-
-data Moved = NotMoved | MovedTo Url
-data ETag = Strong TL.Text
-          | Weak TL.Text
-data ProcessingResult = Succeeded
-                      | SucceededWithContent MediaType TL.Text
-                      | SucceededSeeOther Url
-                      | SucceededWithLocation Url
-                      | Failed
-data DeleteResult = NotDeleted
-                  | Deleted
-                  | DeletedWithContent MediaType TL.Text
-                  deriving Eq
-data Authorized = Authorized | NotAuthorized Challenge
-
-instance Default RequestState where
-  def = RequestState def def def def def
-
-data RequestState = RequestState
-  { _method      :: (Maybe StdMethod)       -- Method
-  , _handler     :: (Maybe (Handler ()))    -- Handler found
-  , _newResource :: (Maybe Bool)            -- New resource?
-  , _eTag        :: (Maybe (Maybe ETag))    -- ETag, if computed
-  , _lastModified :: (Maybe (Maybe UTCTime)) -- Last modified, if computed
-  }
-
-data RestConfig = RestConfig
-  { allowedMethods       :: RestM [StdMethod]
-  , resourceExists       :: RestM Bool
-  , previouslyExisted    :: RestM Bool
-  , isConflict           :: RestM Bool
-  , contentTypesAccepted :: RestM [(MediaType, Handler ProcessingResult)]
-  , contentTypesProvided :: RestM [(MediaType, Handler ())]
-  , deleteResource       :: RestM DeleteResult
-  , deleteCompleted      :: RestM Bool
-  , optionsHandler       :: RestM (Maybe (Handler ()))
-  , charSetsProvided     :: RestM (Maybe [TL.Text])
-  , generateEtag         :: RestM (Maybe ETag)
-  , lastModified         :: RestM (Maybe UTCTime)
-  , isAuthorized         :: RestM Authorized
-  , serviceAvailable     :: RestM Bool
-  , allowMissingPost     :: RestM Bool
-  , multipleChoices      :: RestM Bool
-  , movedPermanently     :: RestM Moved
-  , movedTemporarily     :: RestM Moved
-  }
-
-instance Default RestConfig where
- def = RestConfig { allowedMethods       = return [GET, HEAD, OPTIONS]
-                  , resourceExists       = return True
-                  , previouslyExisted    = return False
-                  , isConflict           = return False
-                  , contentTypesAccepted = return []
-                  , contentTypesProvided = return []
-                  , deleteResource       = return NotDeleted
-                  , deleteCompleted      = return True
-                  , optionsHandler       = return Nothing
-                  , charSetsProvided     = return Nothing
-                  , generateEtag         = return Nothing
-                  , lastModified         = return Nothing
-                  , isAuthorized         = return Authorized
-                  , serviceAvailable     = return True
-                  , allowMissingPost     = return True
-                  , multipleChoices      = return False
-                  , movedPermanently     = return NotMoved
-                  , movedTemporarily     = return NotMoved
-                  }
-
-data RestException = MovedPermanently301
-                   | MovedTemporarily307
-                   | BadRequest400
-                   | Unauthorized401
-                   | NotFound404
-                   | NotAcceptable406
-                   | Conflict409
-                   | Gone410
-                   | PreconditionFailed412
-                   | UnsupportedMediaType415
-                   | NotImplemented501
-                   | ServiceUnavailable503
-                   | MethodNotAllowed405
-                   | InternalServerError TL.Text
-                   deriving (Show, Eq)
-
-instance ScottyError RestException where
-  stringError = InternalServerError . TL.pack
-  showError = fromString . show
-
-$(makeLensesBy (\n -> Just ((tail n) ++ "'")) ''RequestState)
 
 defaultConfig :: RestConfig
 defaultConfig = def
@@ -373,7 +270,6 @@ resourceWithLocation url = do
              status' created201
      else status' noContent204
 
--- C
 resourceWithContent :: MediaType -> TL.Text -> RestM ()
 resourceWithContent t c = do
   config <- ask
@@ -486,7 +382,6 @@ isModifiedSince given onTrue onFalse = do
     where modifiedSince :: UTCTime -> TL.Text -> Bool
           modifiedSince = undefined
 
-fromCache :: Lens' RequestState (Maybe a) -> RestM a
 fromCache lens = use lens >>= \case
   Just v  -> return v
   Nothing -> stopWith (InternalServerError "Cached state variable missing")
