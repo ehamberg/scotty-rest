@@ -25,10 +25,13 @@ module Web.Scotty.Rest.Types
   , newResource'
   , eTag'
   , lastModified'
+  , isAvailable'
+  -- * Lens helpers
   , store
   , retrieve
   , computeOnce
   , cached
+  , fromConfig
   -- * Re-exports
   , MediaType
   , StdMethod(..)
@@ -79,7 +82,8 @@ emptyHanderState config = do
   n <- liftIO newEmptyMVar
   e <- liftIO newEmptyMVar
   l <- liftIO newEmptyMVar
-  return (HandlerState config m h n e l)
+  a <- liftIO newEmptyMVar
+  return (HandlerState config m h n e l a)
 
 data HandlerState = HandlerState
   {
@@ -89,6 +93,7 @@ data HandlerState = HandlerState
   , _newResource  :: !(MVar Bool)
   , _eTag         :: !(MVar (Maybe ETag))    -- ETag, if computed
   , _lastModified :: !(MVar (Maybe UTCTime)) -- Last modified, if computed
+  ,_isAvailable   :: !(MVar Bool)
   }
 
 data RestConfig = RestConfig
@@ -177,3 +182,6 @@ cached :: Lens' HandlerState (MVar a) -> RestM a
 cached field = do
   state <- ask
   liftIO $ readMVar (view field state)
+
+fromConfig :: (RestConfig -> RestM a) -> RestM a
+fromConfig field = retrieve config' >>= field

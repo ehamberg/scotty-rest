@@ -31,7 +31,7 @@ import           Network.HTTP.Date
 import           Network.HTTP.Media        (mapAccept, mapContent, renderHeader)
 import           Network.HTTP.Types        (parseMethod)
 import           Network.HTTP.Types.Status
-import           Network.Wai               (Request, requestMethod)
+import qualified Network.Wai               as Wai
 import           Web.Scotty.Trans
 
 defaultConfig :: RestConfig
@@ -48,7 +48,7 @@ defaultConfig = def
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern $ do
   initialState <- emptyHanderState config
-  let run = (runReaderT (runRestM restHandlerStart) initialState)
+  let run = runReaderT (runRestM restHandlerStart) initialState
   run `rescue` handleExcept
 
 stopWith :: RestException -> RestM a
@@ -60,9 +60,6 @@ runHandler = RestM . lift
 setHeader' :: TL.Text -> TL.Text -> RestM ()
 setHeader' h v = RestM . lift $ setHeader h v
 
-request' :: RestM Request
-request' = RestM . lift $ request
-
 header' :: TL.Text -> RestM (Maybe TL.Text)
 header' = RestM . lift . header
 
@@ -72,21 +69,33 @@ status' = RestM . lift . status
 raw' :: BS.ByteString -> RestM ()
 raw' = RestM . lift .raw
 
+requestMethod :: RestM StdMethod
+requestMethod = computeOnce method' $ do
+  req <- (RestM . lift) request
+  (either (\_ -> stopWith NotImplemented501) return . parseMethod . Wai.requestMethod) req
+
+eTag :: RestM (Maybe ETag)
+eTag = computeOnce eTag' (fromConfig generateEtag)
+
+isAvailable :: RestM Bool
+isAvailable = computeOnce isAvailable' (fromConfig serviceAvailable)
+
+modificationDate :: RestM (Maybe UTCTime)
+modificationDate = computeOnce lastModified' (fromConfig lastModified)
+
 restHandlerStart :: RestM ()
 restHandlerStart = do
-  config <- retrieve config'
   -- Is our service available?
-  available <- serviceAvailable config
+  available <- isAvailable
   unless available (stopWith ServiceUnavailable503)
 
   -- Is the method known?
-  method <- either (\_ -> stopWith NotImplemented501) return . parseMethod . requestMethod =<< request'
-  method' `store` method
+  method <- requestMethod
 
   -- TODO: Is the URI too long?
 
   -- Is the method allowed?
-  allowed <- allowedMethods config
+  allowed <- fromConfig allowedMethods
   when (method `notElem` allowed) $ do
     setAllowHeader
     stopWith MethodNotAllowed405
@@ -94,7 +103,7 @@ restHandlerStart = do
   -- TODO: Is the request malformed?
 
   -- Is the client authorized?
-  isAuthorized config >>= \case
+  fromConfig isAuthorized >>= \case
        Authorized                -> return ()
        (NotAuthorized challenge) -> setHeader' "WWW-Authenticate" challenge >> stopWith Unauthorized401
 
@@ -108,17 +117,15 @@ restHandlerStart = do
 
 setAllowHeader :: RestM ()
 setAllowHeader = do
-  config <- retrieve config'
-  setHeader' "allow" . TL.intercalate ", " . map (TL.pack . show) =<< allowedMethods config
+  allowed <- fromConfig allowedMethods
+  setHeader' "allow" . TL.intercalate ", " . map (TL.pack . show) $ allowed
 
 --------------------------------------------------------------------------------
 -- OPTIONS
 --------------------------------------------------------------------------------
 
 handleOptions :: RestM ()
-handleOptions = do
-  config <- retrieve config'
-  maybe setAllowHeader runHandler =<< optionsHandler config
+handleOptions = maybe setAllowHeader runHandler =<< fromConfig optionsHandler
 
 --------------------------------------------------------------------------------
 -- Content negotiation
@@ -146,8 +153,8 @@ contentNegotiation = do
 
 checkResourceExists :: RestM ()
 checkResourceExists = do
-  method <- cached method'
-  exists <- retrieve config' >>= resourceExists
+  method <- requestMethod
+  exists <- fromConfig resourceExists
   if | method `elem` [GET, HEAD]        -> if exists
                                               then handleGetHeadExisting
                                               else handleGetHeadNonExisting
@@ -170,23 +177,13 @@ handleGetHeadExisting =
   cached handler' >>= runHandler
   -- TODO: multiple choices
 
-handleGetHeadNonExisting :: RestM ()
-handleGetHeadNonExisting = do
-  config <- retrieve config'
-  -- TODO: Has if match? If so: 412
-
-  -- Did this resource exist before?
-  existed <- previouslyExisted config
-  unless existed (stopWith NotFound404)
-
-  moved
-  stopWith Gone410
+handleGetHeadNonExisting :: RestM () -- FIXME: identical to handleDeleteNonExisting
+handleGetHeadNonExisting = handleNonExisting
 
 moved :: RestM ()
 moved = do
-  config <- retrieve config'
-  movedPermanently config >>= moved' MovedPermanently301
-  movedTemporarily config >>= moved' MovedTemporarily307
+  fromConfig movedPermanently >>= moved' MovedPermanently301
+  fromConfig movedTemporarily >>= moved' MovedTemporarily307
     where moved' _ NotMoved      = return ()
           moved' e (MovedTo url) = setHeader' "location" url >> stopWith e
 
@@ -201,8 +198,7 @@ handlePutPostPatchNonExisting =
 
 ppppreviouslyExisted :: RestM ()
 ppppreviouslyExisted = do
-  config <- retrieve config'
-  existed <- previouslyExisted config
+  existed <- fromConfig previouslyExisted
   if existed
      then pppmovedPermanently
      else pppmethodIsPost
@@ -222,11 +218,10 @@ pppmethodIsPut = methodIs [PUT]
 
 handlePutPostPatchExisting :: RestM ()
 handlePutPostPatchExisting = do
-  config <- retrieve config'
   cond
-  method <- cached method'
+  method <- requestMethod
   when (method == PUT) $ do
-    conflict <- isConflict config
+    conflict <- fromConfig isConflict
     when conflict (stopWith Conflict409)
 
   acceptResource
@@ -237,13 +232,12 @@ handlePutPostPatchExisting = do
 
 acceptResource :: RestM ()
 acceptResource = do
-  config <- retrieve config'
   -- Is there a Content-Type header?
   contentTypeHeader <- header' "content-type"
   contentType <- maybe (stopWith UnsupportedMediaType415) (return . E.encodeUtf8 . TL.toStrict) contentTypeHeader
 
   -- Do we have a handler for this content type? If so, run it. Alternatively, return 415.
-  handlers <- contentTypesAccepted config
+  handlers <- fromConfig contentTypesAccepted
   result <- maybe (stopWith UnsupportedMediaType415) runHandler (mapContent handlers contentType)
 
   case result of
@@ -270,10 +264,9 @@ resourceWithLocation url = do
 
 resourceWithContent :: MediaType -> TL.Text -> RestM ()
 resourceWithContent t c = do
-  config <- retrieve config'
   setContentTypeHeader t
   (raw' . LE.encodeUtf8) c
-  multiple <- multipleChoices config
+  multiple <- fromConfig multipleChoices
   if multiple
      then status' multipleChoices300
      else status' ok200
@@ -284,11 +277,10 @@ resourceWithContent t c = do
 
 handleDeleteExisting :: RestM ()
 handleDeleteExisting = do
-  config <- retrieve config'
   cond
-  result <- deleteResource config
+  result <- fromConfig deleteResource
   when (result == NotDeleted) (stopWith (InternalServerError "Could not delete resource"))
-  completed <- deleteCompleted config
+  completed <- fromConfig deleteCompleted
   case (result,completed) of
        (Deleted,False)            -> status' accepted202
        (Deleted,True)             -> status' noContent204
@@ -296,13 +288,7 @@ handleDeleteExisting = do
        _                          -> stopWith (InternalServerError "“Impossible” state")
 
 handleDeleteNonExisting :: RestM ()
-handleDeleteNonExisting = do
-  config <- retrieve config'
-  -- TODO: has if-match?
-  existed <- previouslyExisted config
-  unless existed (stopWith NotFound404)
-  moved
-  stopWith Gone410
+handleDeleteNonExisting = handleNonExisting
 
 --------------------------------------------------------------------------------
 -- Conditional requests
@@ -332,45 +318,55 @@ condIfNoneMatch = return () -- TODO
 -- Helpers
 --------------------------------------------------------------------------------
 
+handleNonExisting :: RestM ()
+handleNonExisting = do
+  -- TODO: Has if match? If so: 412
+
+  -- Did this resource exist before?
+  existed <- fromConfig previouslyExisted
+  unless existed (stopWith NotFound404)
+
+  moved
+  stopWith Gone410
+
 setContentTypeHeader :: MediaType -> RestM ()
 setContentTypeHeader = setHeader' "content-type" . LE.decodeUtf8 . BS.fromStrict . renderHeader
 
 methodIs :: [StdMethod] -> RestM () -> RestM () -> RestM ()
 methodIs ms onTrue onFalse = do
-  m <- computeOnce method' (error "343method")
-  if m `elem` ms
+  method <- requestMethod
+  if method `elem` ms
      then onTrue
      else onFalse
 
 allowsMissingPost :: RestM () -> RestM () -> RestM ()
 allowsMissingPost onTrue onFalse = do
-  config <- retrieve config'
-  allowed <- allowMissingPost config
+  allowed <- fromConfig allowMissingPost
   if allowed
      then newResource' `store` True >> onTrue
      else onFalse
 
 eTagMatches :: TL.Text -> RestM () -> RestM () -> RestM ()
 eTagMatches given onTrue onFalse = do
-  eTag <- computeOnce eTag' (retrieve config' >>= generateEtag)
-  case eTag of
+  tag <- eTag
+  case tag of
        Nothing -> onFalse
        Just e  -> if eTagMatch e given
                      then onTrue
                      else onFalse
     where eTagMatch :: ETag -> TL.Text -> Bool
-          eTagMatch = (error "etagmatch")
+          eTagMatch = undefined
 
 isModifiedSince :: TL.Text -> RestM () -> RestM () -> RestM ()
 isModifiedSince given onTrue onFalse = do
-  modified <- computeOnce lastModified' (retrieve config' >>= lastModified)
+  modified <- modificationDate
   case modified of
        Nothing -> onFalse
        Just d  -> if modifiedSince d given
                      then onTrue
                      else onFalse
     where modifiedSince :: UTCTime -> TL.Text -> Bool
-          modifiedSince = error ("modifiedSince")
+          modifiedSince = undefined
 
 handleExcept :: RestException -> ActionT RestException IO ()
 handleExcept MovedPermanently301     = status movedPermanently301
