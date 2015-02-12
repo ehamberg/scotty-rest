@@ -1,6 +1,6 @@
-{-# Language LambdaCase #-}
-{-# Language MultiWayIf #-}
-{-# Language OverloadedStrings #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE MultiWayIf        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Web.Scotty.Rest
   (
@@ -16,23 +16,23 @@ module Web.Scotty.Rest
   , StdMethod(..)
   ) where
 
-import Web.Scotty.Rest.Types
+import           Web.Scotty.Rest.Types
 
-import Data.Maybe (fromMaybe)
-import Web.Scotty.Trans
-import Network.HTTP.Date
-import Network.HTTP.Types (parseMethod)
-import Network.HTTP.Types.Status
-import Network.HTTP.Media (mapAccept, mapContent, renderHeader)
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Encoding as E
-import qualified Data.Text.Lazy.Encoding as LE
-import Network.Wai (Request, requestMethod)
-import qualified Data.ByteString.Lazy as BS
-import Data.Default.Class (Default(..), def)
-import Control.Monad ((>=>), unless, when)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Reader (runReaderT)
+import           Control.Monad             (unless, when, (>=>))
+import           Control.Monad.Reader      (runReaderT)
+import           Control.Monad.Trans.Class (lift)
+import qualified Data.ByteString.Lazy      as BS
+import           Data.Default.Class        (Default (..), def)
+import           Data.Maybe                (fromMaybe)
+import qualified Data.Text.Encoding        as E
+import qualified Data.Text.Lazy            as TL
+import qualified Data.Text.Lazy.Encoding   as LE
+import           Network.HTTP.Date
+import           Network.HTTP.Media        (mapAccept, mapContent, renderHeader)
+import           Network.HTTP.Types        (parseMethod)
+import           Network.HTTP.Types.Status
+import           Network.Wai               (Request, requestMethod)
+import           Web.Scotty.Trans
 
 defaultConfig :: RestConfig
 defaultConfig = def

@@ -1,6 +1,6 @@
-{-# Language GeneralizedNewtypeDeriving #-}
-{-# Language RankNTypes #-}
-{-# Language TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Web.Scotty.Rest.Types
@@ -36,17 +36,17 @@ module Web.Scotty.Rest.Types
   ) where
 
 import           Control.Concurrent.MVar (MVar, isEmptyMVar, newEmptyMVar, putMVar, readMVar)
-import           Control.Monad (when)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Reader (MonadReader, ReaderT, ask)
-import           Data.Default.Class (Default(..), def)
-import           Data.String (fromString)
-import qualified Data.Text.Lazy as TL
-import           Data.Time.Clock (UTCTime)
+import           Control.Monad           (when)
+import           Control.Monad.IO.Class  (MonadIO, liftIO)
+import           Control.Monad.Reader    (MonadReader, ReaderT, ask)
+import           Data.Default.Class      (Default (..), def)
+import           Data.String             (fromString)
+import qualified Data.Text.Lazy          as TL
+import           Data.Time.Clock         (UTCTime)
 import           Lens.Family2
-import           Lens.Family2.TH (makeLensesBy)
-import           Network.HTTP.Media (MediaType)
-import           Network.HTTP.Types (StdMethod(..))
+import           Lens.Family2.TH         (makeLensesBy)
+import           Network.HTTP.Media      (MediaType)
+import           Network.HTTP.Types      (StdMethod (..))
 import           Web.Scotty.Trans
 
 newtype RestM a = RestM
