@@ -51,24 +51,6 @@ rest pattern config = matchAny pattern $ do
   let run = runReaderT (runRestM restHandlerStart) initialState
   run `rescue` handleExcept
 
-stopWith :: RestException -> RestM a
-stopWith = RestM . lift . raise
-
-runHandler :: Handler a -> RestM a
-runHandler = RestM . lift
-
-setHeader' :: TL.Text -> TL.Text -> RestM ()
-setHeader' h v = RestM . lift $ setHeader h v
-
-header' :: TL.Text -> RestM (Maybe TL.Text)
-header' = RestM . lift . header
-
-status' :: Status -> RestM ()
-status' = RestM . lift . status
-
-raw' :: BS.ByteString -> RestM ()
-raw' = RestM . lift .raw
-
 requestMethod :: RestM StdMethod
 requestMethod = computeOnce method' $ do
   req <- (RestM . lift) request
@@ -367,6 +349,25 @@ isModifiedSince given onTrue onFalse = do
                      else onFalse
     where modifiedSince :: UTCTime -> TL.Text -> Bool
           modifiedSince = undefined
+
+stopWith :: RestException -> RestM a
+stopWith = RestM . lift . raise
+
+runHandler :: Handler a -> RestM a
+runHandler = RestM . lift
+
+setHeader' :: TL.Text -> TL.Text -> RestM ()
+setHeader' h v = RestM . lift $ setHeader h v
+
+header' :: TL.Text -> RestM (Maybe TL.Text)
+header' = RestM . lift . header
+
+status' :: Status -> RestM ()
+status' = RestM . lift . status
+
+raw' :: BS.ByteString -> RestM ()
+raw' = RestM . lift .raw
+
 
 handleExcept :: RestException -> ActionT RestException IO ()
 handleExcept MovedPermanently301     = status movedPermanently301
