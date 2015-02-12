@@ -1,4 +1,5 @@
 {-# Language GeneralizedNewtypeDeriving #-}
+{-# Language RankNTypes #-}
 {-# Language TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
@@ -16,21 +17,28 @@ module Web.Scotty.Rest.Types
   , RestException(..)
   , Handler
   , Url
+  , emptyHanderState
   -- * Lenses for request state's fields
+  , config'
   , method'
   , handler'
   , newResource'
   , eTag'
   , lastModified'
+  , store
+  , retrieve
+  , computeOnce
+  , cached
   -- * Re-exports
   , MediaType
   , StdMethod(..)
   , UTCTime
   ) where
 
-import           Control.Monad.IO.Class (MonadIO)
-import           Control.Monad.Reader (MonadReader, ReaderT)
-import           Control.Monad.State (MonadState, StateT)
+import           Control.Concurrent.MVar (MVar, isEmptyMVar, newEmptyMVar, putMVar, readMVar)
+import           Control.Monad (when)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Reader (MonadReader, ReaderT, ask)
 import           Data.Default.Class (Default(..), def)
 import           Data.String (fromString)
 import qualified Data.Text.Lazy as TL
@@ -42,8 +50,8 @@ import           Network.HTTP.Types (StdMethod(..))
 import           Web.Scotty.Trans
 
 newtype RestM a = RestM
-  { runRestM :: ReaderT RestConfig (StateT RequestState (ActionT RestException IO)) a
-  } deriving (Functor, Applicative, Monad, MonadIO, MonadState RequestState, MonadReader RestConfig)
+  { runRestM :: ReaderT HandlerState (ActionT RestException IO) a
+  } deriving (Functor, Applicative, Monad, MonadIO, MonadReader HandlerState)
 
 type Handler = ActionT RestException IO
 
@@ -64,15 +72,23 @@ data DeleteResult = NotDeleted
                   deriving Eq
 data Authorized = Authorized | NotAuthorized Challenge
 
-instance Default RequestState where
-  def = RequestState def def def def def
+emptyHanderState :: RestConfig -> ActionT RestException IO HandlerState
+emptyHanderState config = do
+  m <- liftIO newEmptyMVar
+  h <- liftIO newEmptyMVar
+  n <- liftIO newEmptyMVar
+  e <- liftIO newEmptyMVar
+  l <- liftIO newEmptyMVar
+  return (HandlerState config m h n e l)
 
-data RequestState = RequestState
-  { _method      :: (Maybe StdMethod)       -- Method
-  , _handler     :: (Maybe (Handler ()))    -- Handler found
-  , _newResource :: (Maybe Bool)            -- New resource?
-  , _eTag        :: (Maybe (Maybe ETag))    -- ETag, if computed
-  , _lastModified :: (Maybe (Maybe UTCTime)) -- Last modified, if computed
+data HandlerState = HandlerState
+  {
+    _config       :: !RestConfig
+  , _method       :: !(MVar StdMethod)
+  , _handler      :: !(MVar (Handler ()))
+  , _newResource  :: !(MVar Bool)
+  , _eTag         :: !(MVar (Maybe ETag))    -- ETag, if computed
+  , _lastModified :: !(MVar (Maybe UTCTime)) -- Last modified, if computed
   }
 
 data RestConfig = RestConfig
@@ -137,4 +153,27 @@ instance ScottyError RestException where
   stringError = InternalServerError . TL.pack
   showError = fromString . show
 
-$(makeLensesBy (\n -> Just ((tail n) ++ "'")) ''RequestState)
+$(makeLensesBy (\n -> Just (tail n ++ "'")) ''HandlerState)
+
+store :: Lens' HandlerState (MVar a) -> a -> RestM ()
+store field value = do
+  state <- ask
+  liftIO $ putMVar (view field state) value
+
+retrieve :: Lens' HandlerState a -> RestM a
+retrieve field = do
+  state <- ask
+  return (view field state)
+
+computeOnce :: Lens' HandlerState (MVar a) -> RestM a -> RestM a
+computeOnce field computation = do
+  state <- ask
+  let var = view field state
+  empty <- liftIO $ isEmptyMVar var
+  when empty (computation >>= liftIO . putMVar var)
+  liftIO $ readMVar var
+
+cached :: Lens' HandlerState (MVar a) -> RestM a
+cached field = do
+  state <- ask
+  liftIO $ readMVar (view field state)
