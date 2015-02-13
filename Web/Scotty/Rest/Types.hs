@@ -26,6 +26,7 @@ module Web.Scotty.Rest.Types
   , eTag'
   , lastModified'
   , isAvailable'
+  , now'
   -- * Lens helpers
   , store
   , retrieve
@@ -77,13 +78,14 @@ data Authorized = Authorized | NotAuthorized Challenge
 
 emptyHanderState :: RestConfig -> ActionT RestException IO HandlerState
 emptyHanderState config = do
-  m <- liftIO newEmptyMVar
-  h <- liftIO newEmptyMVar
-  n <- liftIO newEmptyMVar
-  e <- liftIO newEmptyMVar
-  l <- liftIO newEmptyMVar
-  a <- liftIO newEmptyMVar
-  return (HandlerState config m h n e l a)
+  method      <- liftIO newEmptyMVar
+  handler     <- liftIO newEmptyMVar
+  newResource <- liftIO newEmptyMVar
+  tag         <- liftIO newEmptyMVar
+  modified    <- liftIO newEmptyMVar
+  available   <- liftIO newEmptyMVar
+  now         <- liftIO newEmptyMVar
+  return (HandlerState config method handler newResource tag modified available now)
 
 data HandlerState = HandlerState
   {
@@ -94,6 +96,7 @@ data HandlerState = HandlerState
   , _eTag         :: !(MVar (Maybe ETag))    -- ETag, if computed
   , _lastModified :: !(MVar (Maybe UTCTime)) -- Last modified, if computed
   ,_isAvailable   :: !(MVar Bool)
+  ,_now           :: !(MVar UTCTime)
   }
 
 data RestConfig = RestConfig

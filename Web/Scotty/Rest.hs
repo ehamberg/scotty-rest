@@ -21,12 +21,15 @@ import           Web.Scotty.Rest.Types
 import           Control.Monad             (unless, when, (>=>))
 import           Control.Monad.Reader      (runReaderT)
 import           Control.Monad.Trans.Class (lift)
+import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import qualified Data.ByteString.Lazy      as BS
 import           Data.Default.Class        (Default (..), def)
 import           Data.Maybe                (fromMaybe)
 import qualified Data.Text.Encoding        as E
 import qualified Data.Text.Lazy            as TL
 import qualified Data.Text.Lazy.Encoding   as LE
+import           Data.Time.Clock           (UTCTime(..), secondsToDiffTime)
+import           Data.Time.Calendar        (fromGregorian)
 import           Network.HTTP.Date
 import           Network.HTTP.Media        (mapAccept, mapContent, renderHeader)
 import           Network.HTTP.Types        (parseMethod)
@@ -280,25 +283,37 @@ cond :: RestM ()
 cond = condIfMatch
 
 condIfMatch :: RestM ()
-condIfMatch = do
-  im <- header' "if-match"
-  case im of
-       Nothing -> condIfUnmodifiedSince
-       Just m  -> eTagMatches m condIfUnmodifiedSince (stopWith PreconditionFailed412)
+condIfMatch = header' "if-match" >>= \case
+  Nothing  -> condIfUnmodifiedSince
+  Just hdr -> eTagMatches hdr condIfUnmodifiedSince (stopWith PreconditionFailed412)
 
 condIfUnmodifiedSince :: RestM ()
-condIfUnmodifiedSince = do
-  im <- header' "if-unmodified-since"
-  case im of
-       Nothing -> condIfNoneMatch
-       Just m  -> isModifiedSince m condIfNoneMatch (stopWith PreconditionFailed412)
+condIfUnmodifiedSince = isModified "if-unmodified-since" >>= \case
+       Nothing    -> condIfNoneMatch -- If there are any errors: continue
+       Just False -> condIfNoneMatch
+       Just True  -> stopWith PreconditionFailed412
 
 condIfNoneMatch :: RestM ()
-condIfNoneMatch = return () -- TODO
+condIfNoneMatch = header' "if-none-match" >>= \case
+  Nothing  -> condIfModifiedSince
+  Just hdr -> eTagMatches hdr condIfModifiedSince (stopWith PreconditionFailed412 {- FIXME: method is get/head? ... -})
+
+condIfModifiedSince :: RestM ()
+condIfModifiedSince = isModified "if-modified-since" >>= \case
+       Nothing    -> return ()
+       Just False -> undefined {- FIXME: generate etag, expires, 304 -}
+       Just True  -> return ()
 
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
+
+isModified :: TL.Text -> RestM (Maybe Bool)
+isModified hdr = runMaybeT $ do
+    modDate   <- MaybeT modificationDate
+    hdrDate   <- MaybeT (header' hdr)
+    unmodDate <- MaybeT (return (httpDateToUTCTime hdrDate))
+    return (modDate > unmodDate)
 
 handleNonExisting :: RestM ()
 handleNonExisting = do
@@ -339,16 +354,18 @@ eTagMatches given onTrue onFalse = do
     where eTagMatch :: ETag -> TL.Text -> Bool
           eTagMatch = undefined
 
-isModifiedSince :: TL.Text -> RestM () -> RestM () -> RestM ()
-isModifiedSince given onTrue onFalse = do
-  modified <- modificationDate
-  case modified of
-       Nothing -> onFalse
-       Just d  -> if modifiedSince d given
-                     then onTrue
-                     else onFalse
-    where modifiedSince :: UTCTime -> TL.Text -> Bool
-          modifiedSince = undefined
+httpDateToUTCTime :: TL.Text -> Maybe UTCTime
+httpDateToUTCTime hdr = do
+  headerDate <- (parseHTTPDate . E.encodeUtf8 . TL.toStrict) hdr
+  let year = (fromIntegral . hdYear) headerDate
+      mon  = hdMonth headerDate
+      day  = hdDay headerDate
+      h    = hdHour headerDate
+      m    = hdMinute headerDate
+      s    = hdSecond headerDate
+      date = fromGregorian year mon day
+      time = secondsToDiffTime . fromIntegral $ h*60*60 + m*60 + s
+  return $ UTCTime date time
 
 stopWith :: RestException -> RestM a
 stopWith = RestM . lift . raise
