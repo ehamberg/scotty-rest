@@ -23,9 +23,10 @@ import           Control.Monad.Reader      (runReaderT)
 import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import qualified Data.ByteString.Lazy      as BS
+import           Data.Convertible          (convert)
 import           Data.Default.Class        (Default (..), def)
 import           Data.Maybe                (fromMaybe)
-import           Data.String.Conversions   (cs)
+import           Data.String.Conversions   ((<>), cs)
 import qualified Data.Text.Lazy            as TL
 import           Data.Time.Clock           (UTCTime(..), secondsToDiffTime)
 import           Data.Time.Calendar        (fromGregorian)
@@ -295,23 +296,37 @@ condIfUnmodifiedSince = checkModificationHeader "if-unmodified-since" >>= \case
 condIfNoneMatch :: RestM ()
 condIfNoneMatch = header' "if-none-match" >>= \case
   Nothing  -> condIfModifiedSince
-  Just hdr -> eTagMatches hdr condIfModifiedSince (stopWith PreconditionFailed412 {- FIXME: method is get/head? ... -})
+  Just hdr -> eTagMatches hdr condIfModifiedSince match
+    where match = methodIs [GET, HEAD]
+                   (addEtagHeader >> addExpiresHeader >> stopWith NotModified304)
+                   (stopWith PreconditionFailed412)
 
 condIfModifiedSince :: RestM ()
 condIfModifiedSince = checkModificationHeader "if-modified-since" >>= \case
        Nothing    -> return ()
-       Just False -> undefined {- FIXME: generate etag, expires, 304 -}
+       Just False -> (addEtagHeader >> addExpiresHeader >> stopWith NotModified304)
        Just True  -> return ()
 
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
 
+addEtagHeader :: RestM ()
+addEtagHeader = cached eTag' >>= \case
+    Nothing         -> return ()
+    Just (Weak t)   -> setHeader' "etag" ("W/\"" <> t <> "\"")
+    Just (Strong t) -> setHeader' "etag" ("\"" <> t <> "\"")
+
+addExpiresHeader :: RestM ()
+addExpiresHeader = cached expires' >>= \case
+    Nothing  -> return ()
+    Just t   -> setHeader' "expires" (toHttpDateHeader t)
+
 checkModificationHeader :: TL.Text -> RestM (Maybe Bool)
 checkModificationHeader hdr = runMaybeT $ do
     modDate   <- MaybeT modificationDate
     hdrDate   <- MaybeT (header' hdr)
-    unmodDate <- MaybeT (return (httpDateToUTCTime hdrDate))
+    unmodDate <- MaybeT (return (parseHeaderDate hdrDate))
     return (modDate > unmodDate)
 
 handleNonExisting :: RestM ()
@@ -353,8 +368,8 @@ eTagMatches given onTrue onFalse = do
     where eTagMatch :: ETag -> TL.Text -> Bool
           eTagMatch = undefined
 
-httpDateToUTCTime :: TL.Text -> Maybe UTCTime
-httpDateToUTCTime hdr = do
+parseHeaderDate :: TL.Text -> Maybe UTCTime
+parseHeaderDate hdr = do
   headerDate <- (parseHTTPDate . cs) hdr
   let year = (fromIntegral . hdYear) headerDate
       mon  = hdMonth headerDate
@@ -365,6 +380,9 @@ httpDateToUTCTime hdr = do
       date = fromGregorian year mon day
       time = secondsToDiffTime . fromIntegral $ h*60*60 + m*60 + s
   return $ UTCTime date time
+
+toHttpDateHeader :: UTCTime -> TL.Text
+toHttpDateHeader = cs . formatHTTPDate . epochTimeToHTTPDate . convert
 
 stopWith :: RestException -> RestM a
 stopWith = RestM . lift . raise
@@ -387,6 +405,7 @@ raw' = RestM . lift .raw
 
 handleExcept :: RestException -> ActionT RestException IO ()
 handleExcept MovedPermanently301     = status movedPermanently301
+handleExcept NotModified304          = status notModified304
 handleExcept MovedTemporarily307     = status temporaryRedirect307
 handleExcept BadRequest400           = status badRequest400
 handleExcept Unauthorized401         = status unauthorized401

@@ -24,6 +24,7 @@ module Web.Scotty.Rest.Types
   , handler'
   , newResource'
   , eTag'
+  , expires'
   , lastModified'
   , isAvailable'
   , now'
@@ -82,10 +83,11 @@ emptyHanderState config = do
   handler     <- liftIO newEmptyMVar
   newResource <- liftIO newEmptyMVar
   tag         <- liftIO newEmptyMVar
+  expiry      <- liftIO newEmptyMVar
   modified    <- liftIO newEmptyMVar
   available   <- liftIO newEmptyMVar
   now         <- liftIO newEmptyMVar
-  return (HandlerState config method handler newResource tag modified available now)
+  return (HandlerState config method handler newResource tag expiry modified available now)
 
 data HandlerState = HandlerState
   {
@@ -94,6 +96,7 @@ data HandlerState = HandlerState
   , _handler      :: !(MVar (Handler ()))
   , _newResource  :: !(MVar Bool)
   , _eTag         :: !(MVar (Maybe ETag))    -- ETag, if computed
+  , _expires      :: !(MVar (Maybe UTCTime)) -- Expiry time, if computed
   , _lastModified :: !(MVar (Maybe UTCTime)) -- Last modified, if computed
   ,_isAvailable   :: !(MVar Bool)
   ,_now           :: !(MVar UTCTime)
@@ -111,6 +114,7 @@ data RestConfig = RestConfig
   , optionsHandler       :: RestM (Maybe (Handler ()))
   , charSetsProvided     :: RestM (Maybe [TL.Text])
   , generateEtag         :: RestM (Maybe ETag)
+  , expires              :: RestM (Maybe UTCTime)
   , lastModified         :: RestM (Maybe UTCTime)
   , isAuthorized         :: RestM Authorized
   , serviceAvailable     :: RestM Bool
@@ -132,6 +136,7 @@ instance Default RestConfig where
                   , optionsHandler       = return Nothing
                   , charSetsProvided     = return Nothing
                   , generateEtag         = return Nothing
+                  , expires              = return Nothing
                   , lastModified         = return Nothing
                   , isAuthorized         = return Authorized
                   , serviceAvailable     = return True
@@ -142,6 +147,7 @@ instance Default RestConfig where
                   }
 
 data RestException = MovedPermanently301
+                   | NotModified304
                    | MovedTemporarily307
                    | BadRequest400
                    | Unauthorized401
