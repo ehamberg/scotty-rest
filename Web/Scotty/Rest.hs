@@ -288,7 +288,7 @@ condIfMatch = header' "if-match" >>= \case
   Just hdr -> eTagMatches hdr condIfUnmodifiedSince (stopWith PreconditionFailed412)
 
 condIfUnmodifiedSince :: RestM ()
-condIfUnmodifiedSince = isModified "if-unmodified-since" >>= \case
+condIfUnmodifiedSince = checkModificationHeader "if-unmodified-since" >>= \case
        Nothing    -> condIfNoneMatch -- If there are any errors: continue
        Just False -> condIfNoneMatch
        Just True  -> stopWith PreconditionFailed412
@@ -299,7 +299,7 @@ condIfNoneMatch = header' "if-none-match" >>= \case
   Just hdr -> eTagMatches hdr condIfModifiedSince (stopWith PreconditionFailed412 {- FIXME: method is get/head? ... -})
 
 condIfModifiedSince :: RestM ()
-condIfModifiedSince = isModified "if-modified-since" >>= \case
+condIfModifiedSince = checkModificationHeader "if-modified-since" >>= \case
        Nothing    -> return ()
        Just False -> undefined {- FIXME: generate etag, expires, 304 -}
        Just True  -> return ()
@@ -308,8 +308,8 @@ condIfModifiedSince = isModified "if-modified-since" >>= \case
 -- Helpers
 --------------------------------------------------------------------------------
 
-isModified :: TL.Text -> RestM (Maybe Bool)
-isModified hdr = runMaybeT $ do
+checkModificationHeader :: TL.Text -> RestM (Maybe Bool)
+checkModificationHeader hdr = runMaybeT $ do
     modDate   <- MaybeT modificationDate
     hdrDate   <- MaybeT (header' hdr)
     unmodDate <- MaybeT (return (httpDateToUTCTime hdrDate))
