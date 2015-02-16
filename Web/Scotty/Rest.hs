@@ -313,13 +313,13 @@ condIfModifiedSince = checkModificationHeader "if-modified-since" >>= \case
 --------------------------------------------------------------------------------
 
 addEtagHeader :: RestM ()
-addEtagHeader = cached eTag' >>= \case
+addEtagHeader = eTag >>= \case
     Nothing         -> return ()
     Just (Weak t)   -> setHeader' "etag" ("W/\"" <> t <> "\"")
     Just (Strong t) -> setHeader' "etag" ("\"" <> t <> "\"")
 
 addExpiresHeader :: RestM ()
-addExpiresHeader = cached expires' >>= \case
+addExpiresHeader = expiryTime >>= \case
     Nothing  -> return ()
     Just t   -> setHeader' "expires" (toHttpDateHeader t)
 
