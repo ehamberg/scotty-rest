@@ -69,6 +69,9 @@ isAvailable = computeOnce isAvailable' (fromConfig serviceAvailable)
 modificationDate :: RestM (Maybe UTCTime)
 modificationDate = computeOnce lastModified' (fromConfig lastModified)
 
+expiryTime :: RestM (Maybe UTCTime)
+expiryTime = computeOnce expires' (fromConfig expires)
+
 restHandlerStart :: RestM ()
 restHandlerStart = do
   -- Is our service available?
@@ -156,10 +159,10 @@ checkResourceExists = do
 --------------------------------------------------------------------------------
 
 handleGetHeadExisting :: RestM ()
-handleGetHeadExisting =
-  -- TODO: generate etag
-  -- TODO: last modified
-  -- TODO: expires
+handleGetHeadExisting = do
+  addEtagHeader
+  addLastModifiedHeader
+  addExpiresHeader
   cached handler' >>= runHandler
   -- TODO: multiple choices
 
@@ -317,6 +320,11 @@ addEtagHeader = eTag >>= \case
     Nothing         -> return ()
     Just (Weak t)   -> setHeader' "etag" ("W/\"" <> t <> "\"")
     Just (Strong t) -> setHeader' "etag" ("\"" <> t <> "\"")
+
+addLastModifiedHeader :: RestM ()
+addLastModifiedHeader = modificationDate >>= \case
+    Nothing -> return ()
+    Just t  -> setHeader' "last-modified" (toHttpDateHeader t)
 
 addExpiresHeader :: RestM ()
 addExpiresHeader = expiryTime >>= \case
