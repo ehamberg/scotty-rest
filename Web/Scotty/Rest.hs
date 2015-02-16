@@ -26,7 +26,7 @@ import qualified Data.ByteString.Lazy      as BS
 import           Data.Convertible          (convert)
 import           Data.Default.Class        (Default (..), def)
 import           Data.Maybe                (fromMaybe)
-import           Data.String.Conversions   ((<>), cs)
+import           Data.String.Conversions   ((<>), convertString)
 import qualified Data.Text.Lazy            as TL
 import           Data.Time.Clock           (UTCTime(..), secondsToDiffTime)
 import           Data.Time.Calendar        (fromGregorian)
@@ -103,7 +103,7 @@ restHandlerStart = do
 setAllowHeader :: RestM ()
 setAllowHeader = do
   allowed <- fromConfig allowedMethods
-  setHeader' "allow" . TL.intercalate ", " . map (cs . show) $ allowed
+  setHeader' "allow" . TL.intercalate ", " . map (convertString . show) $ allowed
 
 --------------------------------------------------------------------------------
 -- OPTIONS
@@ -120,7 +120,7 @@ contentNegotiation :: RestM ()
 contentNegotiation = do
   config <- retrieve config'
   -- If there is an `Accept` header...
-  accept <- return . cs . fromMaybe "*/*" =<< header' "accept"
+  accept <- return . convertString . fromMaybe "*/*" =<< header' "accept"
   -- ... look at the content types we provide and find and store the best
   -- handler. If we cannot provide that type, stop processing here and return a
   -- NotAcceptable406:
@@ -219,7 +219,7 @@ acceptResource :: RestM ()
 acceptResource = do
   -- Is there a Content-Type header?
   contentTypeHeader <- header' "content-type"
-  contentType <- maybe (stopWith UnsupportedMediaType415) (return . cs) contentTypeHeader
+  contentType <- maybe (stopWith UnsupportedMediaType415) (return . convertString) contentTypeHeader
 
   -- Do we have a handler for this content type? If so, run it. Alternatively, return 415.
   handlers <- fromConfig contentTypesAccepted
@@ -250,7 +250,7 @@ resourceWithLocation url = do
 resourceWithContent :: MediaType -> TL.Text -> RestM ()
 resourceWithContent t c = do
   setContentTypeHeader t
-  (raw' . cs) c
+  (raw' . convertString) c
   multiple <- fromConfig multipleChoices
   if multiple
      then status' multipleChoices300
@@ -341,7 +341,7 @@ handleNonExisting = do
   stopWith Gone410
 
 setContentTypeHeader :: MediaType -> RestM ()
-setContentTypeHeader = setHeader' "content-type" . cs . renderHeader
+setContentTypeHeader = setHeader' "content-type" . convertString . renderHeader
 
 methodIs :: [StdMethod] -> RestM () -> RestM () -> RestM ()
 methodIs ms onTrue onFalse = do
@@ -370,7 +370,7 @@ eTagMatches given onTrue onFalse = do
 
 parseHeaderDate :: TL.Text -> Maybe UTCTime
 parseHeaderDate hdr = do
-  headerDate <- (parseHTTPDate . cs) hdr
+  headerDate <- (parseHTTPDate . convertString) hdr
   let year = (fromIntegral . hdYear) headerDate
       mon  = hdMonth headerDate
       day  = hdDay headerDate
@@ -382,7 +382,7 @@ parseHeaderDate hdr = do
   return $ UTCTime date time
 
 toHttpDateHeader :: UTCTime -> TL.Text
-toHttpDateHeader = cs . formatHTTPDate . epochTimeToHTTPDate . convert
+toHttpDateHeader = convertString . formatHTTPDate . epochTimeToHTTPDate . convert
 
 stopWith :: RestException -> RestM a
 stopWith = RestM . lift . raise
