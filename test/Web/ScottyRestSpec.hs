@@ -88,15 +88,28 @@ spec = do
         it "makes sure we get a 307 when a resource existed before and is moved temporarily" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 307, matchHeaders = ["Location" <:> "xxx"]}
 
-    describe "406 Not Acceptable" $
+    describe "406 Not Acceptable" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "")]
       }) $
         it "makes sure we get a 406 when we don't provided the requested type" $ do
-          request "GET" "/" [("Accept","*/*")] ""
-            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept","text/html; charset=utf-8")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
           request "GET" "/" [("Accept","text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 406}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+        contentTypesProvided = return [("text/html; charset=utf-8",text "")]
+      }) $
+        it "makes sure we get a 406 when we don't provided the requested type" $ do
+          request "GET" "/" [("Accept","*/*")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept","text/html; charset=utf-8")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept","text/html; charset=latin1")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+          request "GET" "/" [("Accept","text/*; charset=utf-8")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
 
     describe "409 Conflict" $
       withApp (Rest.rest "/" Rest.defaultConfig {
