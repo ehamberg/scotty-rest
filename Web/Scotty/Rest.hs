@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -16,17 +17,17 @@ module Web.Scotty.Rest
   , StdMethod(..)
   ) where
 
+import           BasePrelude               hiding (Handler)
+
 import           Web.Scotty.Rest.Types
 
-import           Control.Monad             (unless, when, (>=>))
 import           Control.Monad.Reader      (runReaderT)
 import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import qualified Data.ByteString.Lazy      as BS
 import           Data.Convertible          (convert)
 import           Data.Default.Class        (Default (..), def)
-import           Data.Maybe                (fromMaybe)
-import           Data.String.Conversions   ((<>), convertString)
+import           Data.String.Conversions   (convertString)
 import qualified Data.Text.Lazy            as TL
 import           Data.Time.Clock           (UTCTime(..), secondsToDiffTime)
 import           Data.Time.Calendar        (fromGregorian)

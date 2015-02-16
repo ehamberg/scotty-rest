@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
@@ -40,12 +41,11 @@ module Web.Scotty.Rest.Types
   , UTCTime
   ) where
 
-import           Control.Concurrent.MVar (MVar, isEmptyMVar, newEmptyMVar, putMVar, readMVar)
-import           Control.Monad           (when)
+import           BasePrelude             hiding (Handler)
+
 import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Control.Monad.Reader    (MonadReader, ReaderT, ask)
 import           Data.Default.Class      (Default (..), def)
-import           Data.String             (fromString)
 import qualified Data.Text.Lazy          as TL
 import           Data.Time.Clock         (UTCTime)
 import           Lens.Family2
@@ -183,8 +183,8 @@ computeOnce :: Lens' HandlerState (MVar a) -> RestM a -> RestM a
 computeOnce field computation = do
   state <- ask
   let var = view field state
-  empty <- liftIO $ isEmptyMVar var
-  when empty (computation >>= liftIO . putMVar var)
+  isEmpty <- liftIO $ isEmptyMVar var
+  when isEmpty (computation >>= liftIO . putMVar var)
   liftIO $ readMVar var
 
 cached :: Lens' HandlerState (MVar a) -> RestM a
