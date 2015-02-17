@@ -8,13 +8,18 @@ module Web.Scotty.Rest
   -- * REST handler to Scotty
     rest
   -- * Callback result types
+  , Authorized(..)
+  , DeleteResult(..)
+  , ETag(..)
+  , Moved(..)
   , ProcessingResult(..)
-  , Authorized(..) , Moved(..)
   -- * Config
   , RestConfig(..)
   , defaultConfig
   -- * Re-exports
+  , MediaType
   , StdMethod(..)
+  , UTCTime
   ) where
 
 import           BasePrelude               hiding (Handler)

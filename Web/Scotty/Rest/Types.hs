@@ -8,15 +8,15 @@ module Web.Scotty.Rest.Types
   (
     RestM(..)
   -- * Callbacks result types
+  , Authorized(..)
+  , DeleteResult(..)
+  , ETag(..)
   , Moved(..)
   , ProcessingResult(..)
-  , DeleteResult(..)
-  , Authorized(..)
-  , ETag(..)
   -- * Internal data types
+  , Handler
   , RestConfig(..)
   , RestException(..)
-  , Handler
   , Url
   , emptyHanderState
   -- * Lenses for request state's fields
@@ -38,7 +38,6 @@ module Web.Scotty.Rest.Types
   -- * Re-exports
   , MediaType
   , StdMethod(..)
-  , UTCTime
   ) where
 
 import           BasePrelude             hiding (Handler)
