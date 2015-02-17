@@ -27,6 +27,42 @@ spec :: Spec
 spec = do
   let withApp = with . scottyAppT id id
 
+  describe "ETag/Expires/Last-Modified headers" $ do
+    describe "ETag" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",text "hello")]
+              , generateEtag = return (Just (Rest.Strong "foo"))
+              }) $
+        it "makes sure we get an ETag header" $
+          request "GET" "/" [] "" `shouldRespondWith` "hello" {matchHeaders = ["ETag" <:> "\"foo\""]}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",text "hello")]
+              , generateEtag = return (Just (Rest.Weak "foo"))
+              }) $
+        it "makes sure we get a (weak) ETag header" $
+          request "GET" "/" [] "" `shouldRespondWith` "hello" {matchHeaders = ["ETag" <:> "W/\"foo\""]}
+
+    describe "Expires" $ do
+      let now = read "2015-02-16 13:11:11.753542 UTC"
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",text "hello")]
+              , expires = return (Just now)
+              }) $
+        it "makes sure we get an Expires header" $ do
+          let expectedHeaders = ["Expires" <:> (cs . Rest.toHttpDateHeader) now]
+          request "GET" "/" [] "" `shouldRespondWith` "hello" {matchHeaders = expectedHeaders}
+
+    describe "Last-Modified" $ do
+      let time = read" 2015-01-01 12:00:00.000000 UTC"
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",text "hello")]
+              , lastModified = return (Just time)
+              }) $
+        it "makes sure we get a Last-Modified header" $ do
+          let expectedHeaders = ["Last-Modified" <:> (cs . Rest.toHttpDateHeader) time]
+          request "GET" "/" [] "" `shouldRespondWith` "hello" {matchHeaders = expectedHeaders}
+
   describe "HTTP" $ do
     describe "503 Not available" $
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $
