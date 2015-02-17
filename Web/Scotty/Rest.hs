@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MultiWayIf        #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Web.Scotty.Rest
@@ -36,8 +36,8 @@ import           Data.Convertible          (convert)
 import           Data.Default.Class        (Default (..), def)
 import           Data.String.Conversions   (convertString)
 import qualified Data.Text.Lazy            as TL
-import           Data.Time.Clock           (UTCTime(..), secondsToDiffTime)
 import           Data.Time.Calendar        (fromGregorian)
+import           Data.Time.Clock           (UTCTime (..), secondsToDiffTime)
 import           Network.HTTP.Date
 import           Network.HTTP.Media        (mapAccept, mapContent, renderHeader)
 import           Network.HTTP.Types        (parseMethod)
