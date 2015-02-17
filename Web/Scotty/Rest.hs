@@ -20,6 +20,8 @@ module Web.Scotty.Rest
   , MediaType
   , StdMethod(..)
   , UTCTime
+  -- * Utilities
+  , toHttpDateHeader
   ) where
 
 import           BasePrelude               hiding (Handler)
