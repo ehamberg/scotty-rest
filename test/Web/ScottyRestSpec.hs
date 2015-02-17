@@ -64,6 +64,17 @@ spec = do
           request "GET" "/" [] "" `shouldRespondWith` "hello" {matchHeaders = expectedHeaders}
 
   describe "HTTP" $ do
+    describe "OPTIONS" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig) $
+        it "makes sure we get a list of allowed methods for OPTIONS" $ do
+          let expectedHeaders = ["Allow" <:> "GET, HEAD, OPTIONS"]
+          request "OPTIONS" "/" [] "" `shouldRespondWith` "" {matchHeaders = expectedHeaders}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {allowedMethods = return [GET, POST, PATCH]}) $
+        it "makes sure we get a list of allowed methods for OPTIONS" $ do
+          let expectedHeaders = ["Allow" <:> "GET, POST, PATCH"]
+          request "OPTIONS" "/" [] "" `shouldRespondWith` "" {matchHeaders = expectedHeaders}
+
     describe "503 Not available" $
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $
         it "makes sure we get a 503 when serviceAvailable returns False" $
