@@ -15,7 +15,7 @@ import Web.Scotty.Rest (RestConfig(..), StdMethod(..))
 
 import Control.Monad (liftM)
 import Data.ByteString.Char8 (pack)
-import Data.Text.Lazy.Encoding (decodeUtf8)
+import Data.String.Conversions (cs)
 
 instance Arbitrary Rest.StdMethod where
   arbitrary = elements (enumFromTo minBound maxBound)
@@ -146,7 +146,7 @@ spec = do
     describe "Echo server" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           contentTypesProvided = return [("text/plain",text "wtf")],
-          contentTypesAccepted = return [("text/plain",liftM (Rest.SucceededWithContent  "text/plain" . decodeUtf8) body)],
+          contentTypesAccepted = return [("text/plain",liftM (Rest.SucceededWithContent  "text/plain" . cs) body)],
           allowedMethods = return [POST]
         }) $
         it "makes sure we can POST a text/plain body and get it back" $

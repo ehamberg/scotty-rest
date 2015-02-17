@@ -59,6 +59,7 @@ test-suite spec
                , QuickCheck
                , scotty
                , scotty-rest
+               , string-conversions
                , text
                , wai
   GHC-options: -Wall -threaded -fno-warn-orphans
