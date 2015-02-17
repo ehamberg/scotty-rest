@@ -40,6 +40,7 @@ module Web.Scotty.Rest.Types
   , StdMethod(..)
   ) where
 
+import           Web.Scotty.Rest.Internal.CachedVar
 
 import           BasePrelude                        hiding (Handler)
 
@@ -79,27 +80,27 @@ data Authorized = Authorized | NotAuthorized Challenge
 
 emptyHanderState :: RestConfig -> ActionT RestException IO HandlerState
 emptyHanderState config = do
-  method      <- liftIO newEmptyMVar
-  handler     <- liftIO newEmptyMVar
-  newResource <- liftIO newEmptyMVar
-  tag         <- liftIO newEmptyMVar
-  expiry      <- liftIO newEmptyMVar
-  modified    <- liftIO newEmptyMVar
-  available   <- liftIO newEmptyMVar
-  now         <- liftIO newEmptyMVar
+  method      <- liftIO newEmtpyCachedVar
+  handler     <- liftIO newEmtpyCachedVar
+  newResource <- liftIO newEmtpyCachedVar
+  tag         <- liftIO newEmtpyCachedVar
+  expiry      <- liftIO newEmtpyCachedVar
+  modified    <- liftIO newEmtpyCachedVar
+  available   <- liftIO newEmtpyCachedVar
+  now         <- liftIO newEmtpyCachedVar
   return (HandlerState config method handler newResource tag expiry modified available now)
 
 data HandlerState = HandlerState
   {
     _config       :: !RestConfig
-  , _method       :: !(MVar StdMethod)
-  , _handler      :: !(MVar (Handler ()))
-  , _newResource  :: !(MVar Bool)
-  , _eTag         :: !(MVar (Maybe ETag))    -- ETag, if computed
-  , _expires      :: !(MVar (Maybe UTCTime)) -- Expiry time, if computed
-  , _lastModified :: !(MVar (Maybe UTCTime)) -- Last modified, if computed
-  ,_isAvailable   :: !(MVar Bool)
-  ,_now           :: !(MVar UTCTime)
+  , _method       :: !(CachedVar StdMethod)
+  , _handler      :: !(CachedVar (Handler ()))
+  , _newResource  :: !(CachedVar Bool)
+  , _eTag         :: !(CachedVar (Maybe ETag))    -- ETag, if computed
+  , _expires      :: !(CachedVar (Maybe UTCTime)) -- Expiry time, if computed
+  , _lastModified :: !(CachedVar (Maybe UTCTime)) -- Last modified, if computed
+  ,_isAvailable   :: !(CachedVar Bool)
+  ,_now           :: !(CachedVar UTCTime)
   }
 
 data RestConfig = RestConfig
@@ -169,28 +170,27 @@ instance ScottyError RestException where
 
 $(makeLensesBy (\n -> Just (tail n ++ "'")) ''HandlerState)
 
-store :: Lens' HandlerState (MVar a) -> a -> RestM ()
+store :: Lens' HandlerState (CachedVar a) -> a -> RestM ()
 store field value = do
   state <- ask
-  liftIO $ putMVar (view field state) value
+  liftIO $ writeCachedVar (view field state) value
 
 retrieve :: Lens' HandlerState a -> RestM a
 retrieve field = do
   state <- ask
   return (view field state)
 
-computeOnce :: Lens' HandlerState (MVar a) -> RestM a -> RestM a
+computeOnce :: Lens' HandlerState (CachedVar a) -> RestM a -> RestM a
 computeOnce field computation = do
   state <- ask
-  let var = view field state
-  isEmpty <- liftIO $ isEmptyMVar var
-  when isEmpty (computation >>= liftIO . putMVar var)
-  liftIO $ readMVar var
+  let ref = view field state
+  contents <- liftIO $ readIORef ref
+  maybe (computation >>= liftIO . writeAndReturnCachedVar ref) return contents
 
-cached :: Lens' HandlerState (MVar a) -> RestM a
+cached :: Lens' HandlerState (CachedVar a) -> RestM a
 cached field = do
   state <- ask
-  liftIO $ readMVar (view field state)
+  liftIO $ readCachedVar (view field state)
 
 fromConfig :: (RestConfig -> RestM a) -> RestM a
 fromConfig field = retrieve config' >>= field
