@@ -22,8 +22,9 @@ extra-source-files:
     examples/Database.hs
 
 library
-  Exposed-modules: Web.Scotty.Rest
-                 , Web.Scotty.Rest.Types
+  exposed-modules: Web.Scotty.Rest
+  other-modules: Web.Scotty.Rest.Types
+               , Web.Scotty.Rest.Internal.CachedVar
 
   build-depends: base               >= 4.7   && < 4.8
                , base-prelude
