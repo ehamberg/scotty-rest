@@ -62,6 +62,15 @@ rest pattern config = matchAny pattern $ do
   let run = runReaderT (runRestM restHandlerStart) initialState
   run `rescue` handleExcept
 
+handler :: RestM (Handler ())
+handler = computeOnce handler' $ do
+  -- If there is an `Accept` header -- look at the content types we provide and
+  -- find and store the best handler. If we cannot provide that type, stop
+  -- processing here and return a NotAcceptable406:
+  accept <- return . convertString . fromMaybe "*/*" =<< header' "accept"
+  provided <- contentTypesProvided =<< retrieve config'
+  computeOnce handler' (maybe (stopWith NotAcceptable406) return (mapAccept provided accept))
+
 requestMethod :: RestM StdMethod
 requestMethod = computeOnce method' $ do
   req <- (RestM . lift) request
@@ -134,14 +143,9 @@ handleOptions = maybe setAllowHeader runHandler =<< fromConfig optionsHandler
 contentNegotiation :: RestM ()
 contentNegotiation = do
   config <- retrieve config'
-  -- If there is an `Accept` header...
-  accept <- return . convertString . fromMaybe "*/*" =<< header' "accept"
-  -- ... look at the content types we provide and find and store the best
-  -- handler. If we cannot provide that type, stop processing here and return a
-  -- NotAcceptable406:
-  provided <- contentTypesProvided config
-  handler <- maybe (stopWith NotAcceptable406) return (mapAccept provided accept)
-  handler' `store` handler
+  accept <- header' "accept"
+  when (isJust accept) (void handler) -- evalute `handler` to force early 406 (Not acceptable)
+  contentNegotiationAccept
 
   -- TODO: If there is an `Accept-Language` header, check that we provide that
   -- language. If not → 406.
@@ -174,7 +178,7 @@ handleGetHeadExisting = do
   addEtagHeader
   addLastModifiedHeader
   addExpiresHeader
-  cached handler' >>= runHandler
+  runHandler =<< handler
   -- TODO: multiple choices
 
 handleGetHeadNonExisting :: RestM () -- FIXME: identical to handleDeleteNonExisting
