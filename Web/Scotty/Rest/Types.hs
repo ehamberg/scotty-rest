@@ -73,8 +73,9 @@ data ProcessingResult = Succeeded
                       | SucceededWithLocation Url
                       | Failed
 data DeleteResult = NotDeleted
-                  | Deleted
-                  | DeletedWithContent MediaType TL.Text
+                  | DeleteCompleted
+                  | DeleteEnacted -- accepted for processing, but the processing has not been completed (and may never be)
+                  | DeletedWithResponse MediaType TL.Text
                   deriving Eq
 data Authorized = Authorized | NotAuthorized Challenge
 
@@ -111,7 +112,6 @@ data RestConfig = RestConfig
   , contentTypesAccepted :: RestM [(MediaType, Handler ProcessingResult)]
   , contentTypesProvided :: RestM [(MediaType, Handler ())]
   , deleteResource       :: RestM DeleteResult
-  , deleteCompleted      :: RestM Bool
   , optionsHandler       :: RestM (Maybe (Handler ()))
   , charSetsProvided     :: RestM (Maybe [TL.Text])
   , generateEtag         :: RestM (Maybe ETag)
@@ -133,7 +133,6 @@ instance Default RestConfig where
                   , contentTypesAccepted = return []
                   , contentTypesProvided = return []
                   , deleteResource       = return NotDeleted
-                  , deleteCompleted      = return True
                   , optionsHandler       = return Nothing
                   , charSetsProvided     = return Nothing
                   , generateEtag         = return Nothing

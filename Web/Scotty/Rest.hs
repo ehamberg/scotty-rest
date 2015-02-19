@@ -284,12 +284,11 @@ handleDeleteExisting = do
   cond
   result <- fromConfig deleteResource
   when (result == NotDeleted) (stopWith (InternalServerError "Could not delete resource"))
-  completed <- fromConfig deleteCompleted
-  case (result,completed) of
-       (Deleted,False)            -> status' accepted202
-       (Deleted,True)             -> status' noContent204
-       (DeletedWithContent t c,_) -> resourceWithContent t c
-       _                          -> stopWith (InternalServerError "“Impossible” state")
+  case result of
+       DeleteEnacted             -> status' accepted202
+       DeleteCompleted           -> status' noContent204
+       (DeletedWithResponse t c) -> resourceWithContent t c
+       NotDeleted                -> stopWith (InternalServerError "Deleting existing resource failed")
 
 handleDeleteNonExisting :: RestM ()
 handleDeleteNonExisting = handleNonExisting

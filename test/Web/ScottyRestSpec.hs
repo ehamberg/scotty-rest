@@ -75,6 +75,32 @@ spec = do
           let expectedHeaders = ["Allow" <:> "GET, OPTIONS, POST, PATCH"]
           request "OPTIONS" "/" [] "" `shouldRespondWith` "" {matchHeaders = expectedHeaders}
 
+  describe "HTTP (DELETE)" $ do
+    describe "DELETE existing: Fail" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                deleteResource = return Rest.NotDeleted
+              , allowedMethods = return [DELETE]
+              }) $
+        it "makes sure we get a 500 if deleteResource fails" $
+          request "DELETE" "/" [] "" `shouldRespondWith` 500
+
+    describe "DELETE existing: Enacted" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                deleteResource = return Rest.DeleteEnacted
+              , allowedMethods = return [DELETE]
+              }) $
+        it "makes sure we get a 202 if delete is enacted" $
+          request "DELETE" "/" [] "" `shouldRespondWith` 202
+
+    describe "DELETE existing: Completed" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                deleteResource = return Rest.DeleteCompleted
+              , allowedMethods = return [DELETE]
+              }) $
+        it "makes sure we get a 204 if delete is completed" $
+          request "DELETE" "/" [] "" `shouldRespondWith` 204
+
+  describe "HTTP (General)" $ do
     describe "503 Not available" $
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $
         it "makes sure we get a 503 when serviceAvailable returns False" $
