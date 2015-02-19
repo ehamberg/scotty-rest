@@ -65,7 +65,11 @@ rest pattern config = matchAny pattern $ do
 requestMethod :: RestM StdMethod
 requestMethod = computeOnce method' $ do
   req <- (RestM . lift) request
-  (either (\_ -> stopWith NotImplemented501) return . parseMethod . Wai.requestMethod) req
+  case (parseMethod .Wai.requestMethod) req of
+       Left  _       -> stopWith NotImplemented501
+       Right method  -> if method `elem` [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
+                           then return method
+                           else stopWith NotImplemented501
 
 eTag :: RestM (Maybe ETag)
 eTag = computeOnce eTag' (fromConfig generateEtag)
