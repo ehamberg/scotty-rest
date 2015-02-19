@@ -63,8 +63,8 @@ spec = do
           let expectedHeaders = ["Last-Modified" <:> (cs . Rest.toHttpDateHeader) time]
           request "GET" "/" [] "" `shouldRespondWith` "hello" {matchHeaders = expectedHeaders}
 
-  describe "HTTP" $ do
-    describe "OPTIONS" $ do
+  describe "HTTP (OPTIONS)" $
+    describe "Allow header" $ do
       withApp (Rest.rest "/" Rest.defaultConfig) $
         it "makes sure we get a list of allowed methods for OPTIONS" $ do
           let expectedHeaders = ["Allow" <:> "GET, HEAD, OPTIONS"]
