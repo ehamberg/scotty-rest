@@ -122,7 +122,7 @@ restHandlerStart = do
 
   if method == OPTIONS
      then handleOptions
-     else contentNegotiation
+     else contentNegotiationStart
 
 setAllowHeader :: RestM ()
 setAllowHeader = do
@@ -140,20 +140,28 @@ handleOptions = maybe setAllowHeader runHandler =<< fromConfig optionsHandler
 -- Content negotiation
 --------------------------------------------------------------------------------
 
-contentNegotiation :: RestM ()
-contentNegotiation = do
-  config <- retrieve config'
+contentNegotiationStart :: RestM ()
+contentNegotiationStart = contentNegotiationAccept
+
+contentNegotiationAccept :: RestM ()
+contentNegotiationAccept = do
   accept <- header' "accept"
   when (isJust accept) (void handler) -- evalute `handler` to force early 406 (Not acceptable)
-  contentNegotiationAccept
+  contentNegotiationAcceptLanguage
 
-  -- TODO: If there is an `Accept-Language` header, check that we provide that
-  -- language. If not → 406.
-  -- TODO: If there is an `Accept-Charset` header, check that we provide that
-  -- char set. If not → 406.
-  -- TODO: Variances
+-- TODO: If there is an `Accept-Language` header, check that we provide that
+-- language. If not → 406.
+contentNegotiationAcceptLanguage :: RestM ()
+contentNegotiationAcceptLanguage = contentNegotiationAcceptCharSet
 
-  checkResourceExists
+-- TODO: If there is an `Accept-Charset` header, check that we provide that
+-- char set. If not → 406.
+contentNegotiationAcceptCharSet :: RestM ()
+contentNegotiationAcceptCharSet = contentNegotiationVariances
+
+-- TODO
+contentNegotiationVariances :: RestM ()
+contentNegotiationVariances = checkResourceExists
 
 checkResourceExists :: RestM ()
 checkResourceExists = do
