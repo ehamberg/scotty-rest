@@ -63,7 +63,7 @@ spec = do
           let expectedHeaders = ["Last-Modified" <:> (cs . Rest.toHttpDateHeader) time]
           request "GET" "/" [] "" `shouldRespondWith` "hello" {matchHeaders = expectedHeaders}
 
-  describe "HTTP (OPTIONS)" $
+  describe "HTTP (OPTIONS)" $ do
     describe "Allow header" $ do
       withApp (Rest.rest "/" Rest.defaultConfig) $
         it "makes sure we get a list of allowed methods for OPTIONS" $ do
@@ -75,12 +75,14 @@ spec = do
           let expectedHeaders = ["Allow" <:> "GET, OPTIONS, POST, PATCH"]
           request "OPTIONS" "/" [] "" `shouldRespondWith` "" {matchHeaders = expectedHeaders}
 
+    describe "Custom OPTIONS handler" $
+      withApp (Rest.rest "/" Rest.defaultConfig {optionsHandler = return (Just (text "xyz"))}) $
+        it "makes sure a custom OPTIONS handler is run" $
+          request "OPTIONS" "/" [] "" `shouldRespondWith` "xyz"
+
   describe "HTTP (DELETE)" $ do
     describe "DELETE existing: Fail" $
-      withApp (Rest.rest "/" Rest.defaultConfig {
-                deleteResource = return Rest.NotDeleted
-              , allowedMethods = return [DELETE]
-              }) $
+      withApp (Rest.rest "/" Rest.defaultConfig {allowedMethods = return [DELETE]}) $
         it "makes sure we get a 500 if deleteResource fails" $
           request "DELETE" "/" [] "" `shouldRespondWith` 500
 
