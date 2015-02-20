@@ -204,8 +204,9 @@ moved = do
 ----------------------------------------------------------------------------------------------------
 
 handlePutPostPatchNonExisting :: RestM ()
-handlePutPostPatchNonExisting =
-  -- TODO: has if-match?
+handlePutPostPatchNonExisting = do
+  -- If there is an if-match header, the precondition failed since the resource doesn't exist
+  liftM isJust (header' "if-match") >>= (`when` stopWith PreconditionFailed412)
   methodIs [POST, PATCH] ppppreviouslyExisted pppmethodIsPut
 
 ppppreviouslyExisted :: RestM ()
@@ -362,7 +363,8 @@ checkModificationHeader hdr = runMaybeT $ do
 
 handleNonExisting :: RestM ()
 handleNonExisting = do
-  -- TODO: Has if match? If so: 412
+  -- If there is an if-match header, the precondition failed since the resource doesn't exist
+  liftM isJust (header' "if-match") >>= (`when` stopWith PreconditionFailed412)
 
   -- Did this resource exist before?
   existed <- fromConfig previouslyExisted
