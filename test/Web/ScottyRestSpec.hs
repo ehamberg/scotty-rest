@@ -141,13 +141,15 @@ spec = do
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
           previouslyExisted = return True,
-          allowedMethods = return [GET, POST],
+          allowedMethods = return [GET, POST, DELETE],
+          allowMissingPost = return False,
           contentTypesProvided = return [("text/html",undefined)],
           contentTypesAccepted = return [("application/json",undefined)]
         }) $
-        it "makes sure we get a 410 when resource does not exist, but did exist previously" $
+        it "makes sure we get a 410 when resource does not exist, but did exist previously" $ do
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
-          -- request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
+          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
+          request "DELETE" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
 
     describe "301 Moved Permanently" $
       withApp (Rest.rest "/" Rest.defaultConfig {
