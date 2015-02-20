@@ -18,7 +18,7 @@ import           Data.ByteString.Char8   (pack)
 import           Data.String.Conversions (cs)
 
 instance Arbitrary Rest.StdMethod where
-  arbitrary = elements [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
+  arbitrary = elements (enumFromTo minBound maxBound)
 
 main :: IO ()
 main = hspec spec
@@ -112,11 +112,17 @@ spec = do
       it "makes sure we get a 405 when method is not allowed" $
         property $ \m ms -> do
           app <- scottyAppT id id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
-          let check = if m `notElem` ms
-                         then  (`shouldRespondWith` 405)
-                         else \_ -> return ()
+          let known = [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
+          let check = if | m `notElem` known -> (`shouldRespondWith` 501)
+                         | m `notElem` ms    -> (`shouldRespondWith` 405)
+                         | otherwise         -> \_ -> return ()
           let waiSession = check (request ((pack . show) m) "/" [] "")
           runWaiSession waiSession app
+
+    describe "501 Not Implemented" $
+      withApp (Rest.rest "/" Rest.defaultConfig) $
+        it "makes sure we get a 501 when using an unimplemented method" $
+          request "CONNECT" "/" [] "" `shouldRespondWith` 501
 
     describe "401 Unauthorized" $
       withApp (Rest.rest "/" Rest.defaultConfig {isAuthorized = return (Rest.NotAuthorized "Basic")}) $
