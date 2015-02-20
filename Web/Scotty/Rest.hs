@@ -189,7 +189,7 @@ handleGetHeadExisting = do
   runHandler =<< handler
   -- TODO: multiple choices
 
-handleGetHeadNonExisting :: RestM () -- FIXME: identical to handleDeleteNonExisting
+handleGetHeadNonExisting :: RestM ()
 handleGetHeadNonExisting = handleNonExisting
 
 moved :: RestM ()
