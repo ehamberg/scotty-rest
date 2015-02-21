@@ -4,18 +4,18 @@
 
 module Web.ScottyRestSpec (main, spec) where
 
-import           Test.Hspec
-import           Test.Hspec.Wai
-import           Test.Hspec.Wai.Internal
-import           Test.QuickCheck         (Arbitrary, arbitrary, elements, property)
+import Test.Hspec
+import Test.Hspec.Wai
+import Test.Hspec.Wai.Internal
+import Test.QuickCheck         (Arbitrary, arbitrary, elements, property)
 
-import           Web.Scotty.Rest         (RestConfig (..), StdMethod (..))
-import qualified Web.Scotty.Rest         as Rest
-import           Web.Scotty.Trans        hiding (delete, get, patch, post, put, request)
+import           Web.Scotty.Rest  (RestConfig (..), StdMethod (..))
+import qualified Web.Scotty.Rest  as Rest
+import           Web.Scotty.Trans hiding (delete, get, patch, post, put, request)
 
-import           Control.Monad           (liftM)
-import           Data.ByteString.Char8   (pack)
-import           Data.String.Conversions (cs)
+import Control.Monad           (liftM)
+import Data.ByteString.Char8   (pack)
+import Data.String.Conversions (cs)
 
 instance Arbitrary Rest.StdMethod where
   arbitrary = elements (enumFromTo minBound maxBound)

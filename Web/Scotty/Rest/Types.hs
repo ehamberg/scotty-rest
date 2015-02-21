@@ -40,19 +40,19 @@ module Web.Scotty.Rest.Types
   , StdMethod(..)
   ) where
 
-import           Web.Scotty.Rest.Internal.CachedVar
+import Web.Scotty.Rest.Internal.CachedVar
 
-import           BasePrelude                        hiding (Handler)
+import BasePrelude hiding (Handler)
 
-import           Control.Monad.IO.Class             (MonadIO, liftIO)
-import           Control.Monad.Reader               (MonadReader, ReaderT, ask)
-import           Data.Default.Class                 (Default (..), def)
-import qualified Data.Text.Lazy                     as TL
-import           Data.Time.Clock                    (UTCTime)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Reader   (MonadReader, ReaderT, ask)
+import           Data.Default.Class     (Default (..), def)
+import qualified Data.Text.Lazy         as TL
+import           Data.Time.Clock        (UTCTime)
 import           Lens.Family2
-import           Lens.Family2.TH                    (makeLensesBy)
-import           Network.HTTP.Media                 (MediaType)
-import           Network.HTTP.Types                 (StdMethod (..))
+import           Lens.Family2.TH        (makeLensesBy)
+import           Network.HTTP.Media     (Language, MediaType)
+import           Network.HTTP.Types     (StdMethod (..))
 import           Web.Scotty.Trans
 
 newtype RestM a = RestM

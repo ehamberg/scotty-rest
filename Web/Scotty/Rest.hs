@@ -24,9 +24,9 @@ module Web.Scotty.Rest
   , toHttpDateHeader
   ) where
 
-import           BasePrelude               hiding (Handler)
+import BasePrelude hiding (Handler)
 
-import           Web.Scotty.Rest.Types
+import Web.Scotty.Rest.Types
 
 import           Control.Monad.Reader      (runReaderT)
 import           Control.Monad.Trans.Class (lift)

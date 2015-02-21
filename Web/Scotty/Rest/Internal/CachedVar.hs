@@ -10,7 +10,7 @@ module Web.Scotty.Rest.Internal.CachedVar
   , writeAndReturnCachedVar
   ) where
 
-import           BasePrelude
+import BasePrelude
 
 type CachedVar a = IORef (Maybe a)
 
