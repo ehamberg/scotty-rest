@@ -194,6 +194,46 @@ spec = do
           request "GET" "/" [("Accept","text/*; charset=utf-8")] ""
             `shouldRespondWith` "" {matchStatus = 200}
 
+      withApp (Rest.rest "/" Rest.defaultConfig {
+        contentTypesProvided = return [("text/html",text "")],
+        languagesProvided = return (Just ["en-gb", "de"])
+      }) $
+        it "makes sure we get a 406 when we don't provided the requested language" $ do
+          request "GET" "/" [] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept-Language","en-gb")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept-Language","en-GB")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept-Language","en")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept-Language","en-US")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+          request "GET" "/" [("Accept-Language","de")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept-Language","de-DE")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+          request "GET" "/" [("Accept-Language","no")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+          request "GET" "/" [("Accept-Language","no-NB")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+          request "GET" "/" [("Accept-Language","*")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+        contentTypesProvided = return [("text/html",text "")],
+        charsetsProvided = return (Just ["utf-8"])
+      }) $
+        it "makes sure we get a 406 when we don't provided the requested charset" $ do
+          request "GET" "/" [] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept-Charset","UTF-8")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept-Charset","utf-8")] ""
+            `shouldRespondWith` "" {matchStatus = 200}
+          request "GET" "/" [("Accept-Charset","ISO-8859-15")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+
     describe "409 Conflict" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [PUT],

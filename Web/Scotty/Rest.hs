@@ -39,7 +39,8 @@ import qualified Data.Text.Lazy            as TL
 import           Data.Time.Calendar        (fromGregorian)
 import           Data.Time.Clock           (UTCTime (..), secondsToDiffTime)
 import           Network.HTTP.Date
-import           Network.HTTP.Media        (mapAccept, mapContent, renderHeader)
+import           Network.HTTP.Media        (mapAccept, mapContent, matches, parseAccept,
+                                            renderHeader)
 import           Network.HTTP.Types        (parseMethod)
 import           Network.HTTP.Types.Status
 import qualified Network.Wai               as Wai
@@ -69,7 +70,42 @@ handler = computeOnce handler' $ do
   -- processing here and return a NotAcceptable406:
   accept <- return . convertString . fromMaybe "*/*" =<< header' "accept"
   provided <- contentTypesProvided =<< retrieve config'
-  computeOnce handler' (maybe (stopWith NotAcceptable406) return (mapAccept provided accept))
+  maybe (stopWith NotAcceptable406) return (mapAccept provided accept)
+
+language :: RestM (Maybe Language)
+language = computeOnce language' (findPreferred "accept-language" parse languagesProvided match)
+  where parse = parseAccept . convertString
+        match = flip matches
+
+charset :: RestM (Maybe TL.Text)
+charset = computeOnce charset' (findPreferred "accept-charset" parse charsetsProvided match)
+  where parse     = Just
+        match a b = TL.toCaseFold a == TL.toCaseFold b
+
+findPreferred :: TL.Text -> (TL.Text -> Maybe a) -> (RestConfig -> RestM (Maybe [a])) -> (a -> a -> Bool) -> RestM (Maybe a)
+findPreferred headerName parse provided match = do
+  -- If there is an `Accept-{Charsets,Languages}` header and
+  -- `{Charsets,Languages}Provided` is defined, look at what we provide and
+  -- find and store the first acceptable one (languages and charsets are in
+  -- order of preference). If we cannot provide the requested one, stop
+  -- processing here and return a NotAcceptable406.
+  headerAndConfig <- runMaybeT $ do
+      accept  <- MaybeT (header' headerName)
+      provide <- MaybeT (provided =<< retrieve config')
+      return (accept,provide)
+  case headerAndConfig of
+       Nothing    -> return Nothing
+       Just (a,p) -> do
+         -- We now have a new failure mode: Since there is a header, and a list
+         -- of languages/charsets, failing to parse the header, or failing to
+         -- find a match, will now lead to a 406 Not Acceptable:
+         best <- runMaybeT $ do
+           requested <- MaybeT ((return . parse) a)
+           MaybeT ((return . head' . filter (match requested)) p)
+         when (isNothing best) (stopWith NotAcceptable406)
+         return best
+  where head' [] = Nothing
+        head' (x:_) = Just x
 
 requestMethod :: RestM StdMethod
 requestMethod = computeOnce method' $ do
@@ -152,12 +188,18 @@ contentNegotiationAccept = do
 -- TODO: If there is an `Accept-Language` header, check that we provide that
 -- language. If not → 406.
 contentNegotiationAcceptLanguage :: RestM ()
-contentNegotiationAcceptLanguage = contentNegotiationAcceptCharSet
+contentNegotiationAcceptLanguage = do
+  acceptLanguage <- header' "accept-language"
+  when (isJust acceptLanguage) (void language) -- evalute `language` to force early 406 (Not acceptable)
+  contentNegotiationAcceptCharSet
 
 -- TODO: If there is an `Accept-Charset` header, check that we provide that
 -- char set. If not → 406.
 contentNegotiationAcceptCharSet :: RestM ()
-contentNegotiationAcceptCharSet = contentNegotiationVariances
+contentNegotiationAcceptCharSet = do
+  acceptCharset <- header' "accept-charset"
+  when (isJust acceptCharset) (void charset) -- evalute `charset` to force early 406 (Not acceptable)
+  contentNegotiationVariances
 
 -- TODO
 contentNegotiationVariances :: RestM ()

@@ -23,6 +23,8 @@ module Web.Scotty.Rest.Types
   , config'
   , method'
   , handler'
+  , language'
+  , charset'
   , newResource'
   , eTag'
   , expires'
@@ -37,6 +39,7 @@ module Web.Scotty.Rest.Types
   , fromConfig
   -- * Re-exports
   , MediaType
+  , Language
   , StdMethod(..)
   ) where
 
@@ -83,19 +86,23 @@ emptyHanderState :: RestConfig -> ActionT RestException IO HandlerState
 emptyHanderState config = do
   method      <- liftIO newEmtpyCachedVar
   handler     <- liftIO newEmtpyCachedVar
+  language    <- liftIO newEmtpyCachedVar
+  charset     <- liftIO newEmtpyCachedVar
   newResource <- liftIO newEmtpyCachedVar
   tag         <- liftIO newEmtpyCachedVar
   expiry      <- liftIO newEmtpyCachedVar
   modified    <- liftIO newEmtpyCachedVar
   available   <- liftIO newEmtpyCachedVar
   now         <- liftIO newEmtpyCachedVar
-  return (HandlerState config method handler newResource tag expiry modified available now)
+  return (HandlerState config method handler language charset newResource tag expiry modified available now)
 
 data HandlerState = HandlerState
   {
     _config       :: !RestConfig
   , _method       :: !(CachedVar StdMethod)
   , _handler      :: !(CachedVar (Handler ()))
+  , _language     :: !(CachedVar (Maybe Language))
+  , _charset      :: !(CachedVar (Maybe TL.Text))
   , _newResource  :: !(CachedVar Bool)
   , _eTag         :: !(CachedVar (Maybe ETag))    -- ETag, if computed
   , _expires      :: !(CachedVar (Maybe UTCTime)) -- Expiry time, if computed
@@ -111,9 +118,10 @@ data RestConfig = RestConfig
   , isConflict           :: RestM Bool
   , contentTypesAccepted :: RestM [(MediaType, Handler ProcessingResult)]
   , contentTypesProvided :: RestM [(MediaType, Handler ())]
+  , languagesProvided    :: RestM (Maybe [Language])
+  , charsetsProvided     :: RestM (Maybe [TL.Text])
   , deleteResource       :: RestM DeleteResult
   , optionsHandler       :: RestM (Maybe (Handler ()))
-  , charSetsProvided     :: RestM (Maybe [TL.Text])
   , generateEtag         :: RestM (Maybe ETag)
   , expires              :: RestM (Maybe UTCTime)
   , lastModified         :: RestM (Maybe UTCTime)
@@ -132,9 +140,10 @@ instance Default RestConfig where
                   , isConflict           = return False
                   , contentTypesAccepted = return []
                   , contentTypesProvided = return []
+                  , languagesProvided    = return Nothing
+                  , charsetsProvided     = return Nothing
                   , deleteResource       = return NotDeleted
                   , optionsHandler       = return Nothing
-                  , charSetsProvided     = return Nothing
                   , generateEtag         = return Nothing
                   , expires              = return Nothing
                   , lastModified         = return Nothing
