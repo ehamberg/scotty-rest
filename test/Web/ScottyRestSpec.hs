@@ -102,6 +102,17 @@ spec = do
         it "makes sure we get a 204 if delete is completed" $
           request "DELETE" "/" [] "" `shouldRespondWith` 204
 
+  describe "HTTP (POST)" $
+    describe "204: POSTing to missing resource that existed previously" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          allowMissingPost = return True,
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+        }) $
+        it "makes sure we get a 204 when POSTing to resource that existed, when allowing POSTing to missing resource" $
+          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 204}
+
   describe "HTTP (General)" $ do
     describe "503 Not available" $
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $
