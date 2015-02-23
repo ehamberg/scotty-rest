@@ -162,6 +162,15 @@ spec = do
           request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
           request "DELETE" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
 
+    describe "415: Unsupported Media Type" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+        }) $
+        it "makes sure we get a 415 when POSTing with invalid content-type" $
+          request "POST" "/" [("Content-Type","--")] "" `shouldRespondWith` "" {matchStatus = 415}
+
     describe "301 Moved Permanently" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
