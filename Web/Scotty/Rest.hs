@@ -267,19 +267,18 @@ pppmethodIsPost :: RestM ()
 pppmethodIsPost = methodIs [POST] pppmethodIsPut (stopWith NotFound404)
 
 pppmethodIsPut :: RestM ()
-pppmethodIsPut = methodIs [PUT]
-    (retrieve config' >>= (isConflict >=> (\conflict -> if conflict then stopWith Conflict409 else acceptResource)))
-    acceptResource
-
-handlePutPostPatchExisting :: RestM ()
-handlePutPostPatchExisting = do
-  cond
+pppmethodIsPut = do
   method <- requestMethod
   when (method == PUT) $ do
     conflict <- fromConfig isConflict
     when conflict (stopWith Conflict409)
 
   acceptResource
+
+handlePutPostPatchExisting :: RestM ()
+handlePutPostPatchExisting = do
+  cond
+  pppmethodIsPut
 
 ----------------------------------------------------------------------------------------------------
 -- POST/PUT/PATCH, part 2: content-types accepted
