@@ -102,7 +102,7 @@ spec = do
         it "makes sure we get a 204 if delete is completed" $
           request "DELETE" "/" [] "" `shouldRespondWith` 204
 
-  describe "HTTP (POST)" $
+  describe "HTTP (POST)" $ do
     describe "204: POSTing to missing resource that existed previously" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
@@ -112,6 +112,30 @@ spec = do
         }) $
         it "makes sure we get a 204 when POSTing to resource that existed, when allowing POSTing to missing resource" $
           request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 204}
+
+    describe "404: POSTint to never-existed" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          resourceExists = return False,
+          previouslyExisted = return False,
+          allowMissingPost = return False,
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+        }) $
+        it "makes sure we get a 404 when POSTing to a never-existed resource when not allowing missing POSTs" $
+          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 404}
+
+  describe "HTTP (PATCH)" $
+    describe "404: PATCHing a never-existed" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [PATCH],
+          resourceExists = return False,
+          previouslyExisted = return False,
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+        }) $
+        it "makes sure we get a 404 when PATCHing a never-existed resource" $
+          request "PATCH" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 404}
 
   describe "HTTP (General)" $ do
     describe "503 Not available" $

@@ -255,16 +255,19 @@ ppppreviouslyExisted :: RestM ()
 ppppreviouslyExisted = do
   existed <- fromConfig previouslyExisted
   if existed
-     then pppmovedPermanently
+     then pppmovedPermanentlyOrTemporarily
      else pppmethodIsPost
 
-pppmovedPermanently :: RestM ()
-pppmovedPermanently = do
+pppmovedPermanentlyOrTemporarily :: RestM ()
+pppmovedPermanentlyOrTemporarily = do
   moved
   methodIs [POST] (allowsMissingPost acceptResource (stopWith Gone410)) pppmethodIsPut
 
 pppmethodIsPost :: RestM ()
-pppmethodIsPost = methodIs [POST] pppmethodIsPut (stopWith NotFound404)
+pppmethodIsPost =
+  {- if -}   methodIs [POST]
+  {- then -} (allowsMissingPost pppmethodIsPut (stopWith NotFound404))
+  {- else -} (stopWith NotFound404)
 
 pppmethodIsPut :: RestM ()
 pppmethodIsPut = do
