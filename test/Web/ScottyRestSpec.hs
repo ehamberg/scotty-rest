@@ -103,6 +103,53 @@ spec = do
           request "DELETE" "/" [] "" `shouldRespondWith` 204
 
   describe "HTTP (POST)" $ do
+    describe "200: Created with content" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [
+            ("text/plain", return (Rest.SucceededWithContent "text/html" "hi"))
+          ]
+        }) $
+        it "makes sure we get a 201 when handler returns SucceededWithContent" $ do
+          let expectedHeaders = ["Content-Type" <:> "text/html"]
+          request "POST" "/" [("Content-Type","text/plain")] ""
+            `shouldRespondWith` "hi" {matchStatus = 200, matchHeaders = expectedHeaders}
+
+    describe "201: Created" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [
+            ("text/plain",return (Rest.SucceededWithLocation "foo.bar"))
+          ]
+        }) $
+        it "makes sure we get a 201 when handler returns SucceededWithLocation" $ do
+          let expectedHeaders = ["Content-Type" <:> "text/html"]
+          request "POST" "/" [("Content-Type","text/plain")] ""
+            `shouldRespondWith` "" {matchStatus = 201, matchHeaders = expectedHeaders}
+
+    describe "204: No Content" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("text/plain",return Rest.Succeeded)]
+        }) $
+        it "makes sure we get a 204 when handler returns Succeeded" $
+          request "POST" "/" [("Content-Type","text/plain")] ""
+            `shouldRespondWith` "" {matchStatus = 204}
+
+    describe "204: No Content" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          resourceExists = return True,
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("text/plain",return Rest.Succeeded)]
+        }) $
+        it "makes sure we get a 201 when handler returns Succeeded" $
+          request "PUT" "/" [("Content-Type","text/plain")] ""
+            `shouldRespondWith` "" {matchStatus = 204}
+
     describe "204: POSTing to missing resource that existed previously" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
