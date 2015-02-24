@@ -185,7 +185,7 @@ contentNegotiationAccept = do
   when (isJust accept) (void handler) -- evalute `handler` to force early 406 (Not acceptable)
   contentNegotiationAcceptLanguage
 
--- TODO: If there is an `Accept-Language` header, check that we provide that
+-- If there is an `Accept-Language` header, check that we provide that
 -- language. If not → 406.
 contentNegotiationAcceptLanguage :: RestM ()
 contentNegotiationAcceptLanguage = do
@@ -193,7 +193,7 @@ contentNegotiationAcceptLanguage = do
   when (isJust acceptLanguage) (void language) -- evalute `language` to force early 406 (Not acceptable)
   contentNegotiationAcceptCharSet
 
--- TODO: If there is an `Accept-Charset` header, check that we provide that
+-- If there is an `Accept-Charset` header, check that we provide that
 -- char set. If not → 406.
 contentNegotiationAcceptCharSet :: RestM ()
 contentNegotiationAcceptCharSet = do
