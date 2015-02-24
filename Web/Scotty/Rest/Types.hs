@@ -107,8 +107,8 @@ data HandlerState = HandlerState
   , _eTag         :: !(CachedVar (Maybe ETag))    -- ETag, if computed
   , _expires      :: !(CachedVar (Maybe UTCTime)) -- Expiry time, if computed
   , _lastModified :: !(CachedVar (Maybe UTCTime)) -- Last modified, if computed
-  ,_isAvailable   :: !(CachedVar Bool)
-  ,_now           :: !(CachedVar UTCTime)
+  , _isAvailable  :: !(CachedVar Bool)
+  , _now          :: !(CachedVar UTCTime)
   }
 
 data RestConfig = RestConfig

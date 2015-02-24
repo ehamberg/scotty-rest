@@ -106,7 +106,6 @@ spec = do
     describe "204: POSTing to missing resource that existed previously" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
-          allowMissingPost = return True,
           contentTypesProvided = return [("text/html",undefined)],
           contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
         }) $
