@@ -25,7 +25,6 @@ module Web.Scotty.Rest.Types
   , handler'
   , language'
   , charset'
-  , newResource'
   , eTag'
   , expires'
   , lastModified'
@@ -72,8 +71,8 @@ data ETag = Strong TL.Text
           | Weak TL.Text
 data ProcessingResult = Succeeded
                       | SucceededWithContent MediaType TL.Text
-                      | SucceededSeeOther Url
                       | SucceededWithLocation Url
+                      | Redirect Url
                       | Failed
 data DeleteResult = NotDeleted
                   | DeleteCompleted
@@ -88,13 +87,12 @@ emptyHanderState config = do
   handler     <- liftIO newEmtpyCachedVar
   language    <- liftIO newEmtpyCachedVar
   charset     <- liftIO newEmtpyCachedVar
-  newResource <- liftIO newEmtpyCachedVar
   tag         <- liftIO newEmtpyCachedVar
   expiry      <- liftIO newEmtpyCachedVar
   modified    <- liftIO newEmtpyCachedVar
   available   <- liftIO newEmtpyCachedVar
   now         <- liftIO newEmtpyCachedVar
-  return (HandlerState config method handler language charset newResource tag expiry modified available now)
+  return (HandlerState config method handler language charset tag expiry modified available now)
 
 data HandlerState = HandlerState
   {
@@ -103,7 +101,6 @@ data HandlerState = HandlerState
   , _handler      :: !(CachedVar (Handler ()))
   , _language     :: !(CachedVar (Maybe Language))
   , _charset      :: !(CachedVar (Maybe TL.Text))
-  , _newResource  :: !(CachedVar Bool)
   , _eTag         :: !(CachedVar (Maybe ETag))    -- ETag, if computed
   , _expires      :: !(CachedVar (Maybe UTCTime)) -- Expiry time, if computed
   , _lastModified :: !(CachedVar (Maybe UTCTime)) -- Last modified, if computed

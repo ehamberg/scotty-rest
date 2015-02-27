@@ -297,27 +297,21 @@ acceptResource = do
   handlers <- fromConfig contentTypesAccepted
   result <- maybe (stopWith UnsupportedMediaType415) runHandler (mapContent handlers contentType)
 
-  case result of
-       Failed                    -> status' badRequest400
-       Succeeded                 -> status' noContent204
-       SucceededSeeOther url     -> resourceSeeOther url
-       SucceededWithLocation url -> resourceWithLocation url
-       SucceededWithContent t c  -> resourceWithContent t c
+  exists <- fromConfig resourceExists
 
-resourceSeeOther :: Url -> RestM ()
-resourceSeeOther url = do
-  newResource <- cached newResource'
-  if newResource
-     then status' created201
-     else setHeader' "location" url >> status' seeOther303
+  case (result, exists) of
+       (Failed, _)                        -> status' badRequest400
+       (Succeeded, True)                  -> status' noContent204
+       (Succeeded, False)                 -> status' created201
+       (SucceededWithContent t c, True)   -> resourceWithContent t c
+       (SucceededWithContent t c, False)  -> writeContent t c >> status' created201
+       (SucceededWithLocation url, True)  -> locationAndResponseCode url noContent204
+       (SucceededWithLocation url, False) -> locationAndResponseCode url created201
+       (Redirect url, _)                  -> locationAndResponseCode url seeOther303
+    where locationAndResponseCode url response = setHeader' "location" url >> status' response
 
-resourceWithLocation :: Url -> RestM ()
-resourceWithLocation url = do
-  newResource <- cached newResource'
-  if newResource
-     then do setHeader' "location" url
-             status' created201
-     else status' noContent204
+writeContent :: MediaType -> TL.Text -> RestM ()
+writeContent t c = setContentTypeHeader t >> (raw' . convertString) c
 
 resourceWithContent :: MediaType -> TL.Text -> RestM ()
 resourceWithContent t c = do
@@ -431,7 +425,7 @@ allowsMissingPost :: RestM () -> RestM () -> RestM ()
 allowsMissingPost onTrue onFalse = do
   allowed <- fromConfig allowMissingPost
   if allowed
-     then newResource' `store` True >> onTrue
+     then onTrue
      else onFalse
 
 eTagMatches :: TL.Text -> RestM () -> RestM () -> RestM ()
