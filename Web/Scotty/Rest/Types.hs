@@ -13,6 +13,7 @@ module Web.Scotty.Rest.Types
   , ETag(..)
   , Moved(..)
   , ProcessingResult(..)
+  , Representation (..)
   -- * Internal data types
   , Handler
   , RestConfig(..)
@@ -74,6 +75,9 @@ data ProcessingResult = Succeeded
                       | SucceededWithLocation Url
                       | Redirect Url
                       | Failed
+data Representation = UniqueRepresentation
+                    | MultipleRepresentations MediaType TL.Text
+                    | MultipleWithPreferred MediaType TL.Text Url
 data DeleteResult = NotDeleted
                   | DeleteCompleted
                   | DeleteEnacted -- accepted for processing, but the processing has not been completed (and may never be)
@@ -125,7 +129,7 @@ data RestConfig = RestConfig
   , isAuthorized         :: RestM Authorized
   , serviceAvailable     :: RestM Bool
   , allowMissingPost     :: RestM Bool
-  , multipleChoices      :: RestM Bool
+  , multipleChoices      :: RestM Representation
   , movedPermanently     :: RestM Moved
   , movedTemporarily     :: RestM Moved
   }
@@ -147,7 +151,7 @@ instance Default RestConfig where
                   , isAuthorized         = return Authorized
                   , serviceAvailable     = return True
                   , allowMissingPost     = return True
-                  , multipleChoices      = return False
+                  , multipleChoices      = return UniqueRepresentation
                   , movedPermanently     = return NotMoved
                   , movedTemporarily     = return NotMoved
                   }

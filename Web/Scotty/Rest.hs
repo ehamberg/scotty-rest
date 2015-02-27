@@ -13,6 +13,7 @@ module Web.Scotty.Rest
   , ETag(..)
   , Moved(..)
   , ProcessingResult(..)
+  , Representation(..)
   -- * Config
   , RestConfig(..)
   , defaultConfig
@@ -314,13 +315,10 @@ writeContent :: MediaType -> TL.Text -> RestM ()
 writeContent t c = setContentTypeHeader t >> (raw' . convertString) c
 
 resourceWithContent :: MediaType -> TL.Text -> RestM ()
-resourceWithContent t c = do
-  setContentTypeHeader t
-  (raw' . convertString) c
-  multiple <- fromConfig multipleChoices
-  if multiple
-     then status' multipleChoices300
-     else status' ok200
+resourceWithContent t c = fromConfig multipleChoices >>= \case
+  UniqueRepresentation          -> setContentTypeHeader t >> (raw' . convertString) c >> status' ok200
+  MultipleRepresentations t' c' -> writeContent t' c' >> status' multipleChoices300
+  MultipleWithPreferred t' c' u -> writeContent t' c' >> setHeader' "location" u >>  status' multipleChoices300
 
 ----------------------------------------------------------------------------------------------------
 -- DELETE

@@ -255,6 +255,29 @@ spec = do
         it "makes sure we get a 415 when POSTing with invalid content-type" $
           request "POST" "/" [("Content-Type","--")] "" `shouldRespondWith` "" {matchStatus = 415}
 
+    describe "300: Multiple Representations" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [PUT],
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",return (Rest.SucceededWithContent "text/plain" "xxx"))],
+          multipleChoices = return (Rest.MultipleRepresentations "text/plain" "foo")
+        }) $
+        it "makes sure we get a 300 with a body when there are multiple representations" $ do
+          let expectedHeaders = ["Content-Type" <:> "text/plain"]
+          request "PUT" "/" [("Content-Type","application/json")] ""
+            `shouldRespondWith` "foo" {matchStatus = 300, matchHeaders = expectedHeaders}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",return (Rest.SucceededWithContent "text/plain" "xxx"))],
+          multipleChoices = return (Rest.MultipleWithPreferred "text/plain" "foo" "foo.bar")
+        }) $
+        it "makes sure we get a 300 with a location body when there are multiple representations, where one is preferred" $ do
+          let expectedHeaders = ["Location" <:> "foo.bar", "Content-Type" <:> "text/plain"]
+          request "POST" "/" [("Content-Type","application/json")] ""
+            `shouldRespondWith` "foo" {matchStatus = 300, matchHeaders = expectedHeaders}
+
     describe "301 Moved Permanently" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
