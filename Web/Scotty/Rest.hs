@@ -40,8 +40,8 @@ import qualified Data.Text.Lazy            as TL
 import           Data.Time.Calendar        (fromGregorian)
 import           Data.Time.Clock           (UTCTime (..), secondsToDiffTime)
 import           Network.HTTP.Date
-import           Network.HTTP.Media        (mapAccept, mapContent, matches, parseAccept,
-                                            renderHeader)
+import           Network.HTTP.Media        (mapAccept, mapContent, matchAccept, matches,
+                                            parseAccept, renderHeader)
 import           Network.HTTP.Types        (parseMethod)
 import           Network.HTTP.Types.Status
 import qualified Network.Wai               as Wai
@@ -64,14 +64,17 @@ rest pattern config = matchAny pattern $ do
   let run = runReaderT (runRestM restHandlerStart) initialState
   run `rescue` handleExcept
 
-handler :: RestM (Handler ())
-handler = computeOnce handler' $ do
+preferred :: RestM (MediaType,Handler ())
+preferred = computeOnce handler' $ do
   -- If there is an `Accept` header -- look at the content types we provide and
-  -- find and store the best handler. If we cannot provide that type, stop
-  -- processing here and return a NotAcceptable406:
+  -- find and store the best handler together with the content type.  If we
+  -- cannot provide that type, stop processing here and return a
+  -- NotAcceptable406:
   accept <- return . convertString . fromMaybe "*/*" =<< header' "accept"
   provided <- contentTypesProvided =<< retrieve config'
-  maybe (stopWith NotAcceptable406) return (mapAccept provided accept)
+  contentType <- maybe (stopWith NotAcceptable406) return (matchAccept (map fst provided) accept)
+  bestHandler <- maybe (stopWith NotAcceptable406) return (mapAccept provided accept)
+  return (contentType,bestHandler)
 
 language :: RestM (Maybe Language)
 language = computeOnce language' (findPreferred "accept-language" parse languagesProvided match)
@@ -183,7 +186,7 @@ contentNegotiationStart = contentNegotiationAccept
 contentNegotiationAccept :: RestM ()
 contentNegotiationAccept = do
   accept <- header' "accept"
-  when (isJust accept) (void handler) -- evalute `handler` to force early 406 (Not acceptable)
+  when (isJust accept) (void preferred) -- evalute `preferred` to force early 406 (Not acceptable)
   contentNegotiationAcceptLanguage
 
 -- If there is an `Accept-Language` header, check that we provide that
@@ -241,7 +244,9 @@ handleGetHeadExisting = do
   addEtagHeader
   addLastModifiedHeader
   addExpiresHeader
-  runHandler =<< handler
+  (contentType,handler) <- preferred
+  runHandler handler
+  setContentTypeHeader contentType
   -- TODO: multiple choices
 
 handleGetHeadNonExisting :: RestM ()

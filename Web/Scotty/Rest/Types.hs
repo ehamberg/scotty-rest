@@ -102,7 +102,7 @@ data HandlerState = HandlerState
   {
     _config       :: !RestConfig
   , _method       :: !(CachedVar StdMethod)
-  , _handler      :: !(CachedVar (Handler ()))
+  , _handler      :: !(CachedVar (MediaType,Handler ()))
   , _language     :: !(CachedVar (Maybe Language))
   , _charset      :: !(CachedVar (Maybe TL.Text))
   , _eTag         :: !(CachedVar (Maybe ETag))    -- ETag, if computed
