@@ -244,12 +244,14 @@ handleGetHeadExisting = do
   addEtagHeader
   addLastModifiedHeader
   addExpiresHeader
+  method <- requestMethod
   (contentType,handler) <- preferred
   fromConfig multipleChoices >>= \case
-    UniqueRepresentation          -> runHandler handler >> setContentTypeHeader contentType >> status' ok200
     MultipleRepresentations t' c' -> writeContent t' c' >> status' multipleChoices300
     MultipleWithPreferred t' c' u -> writeContent t' c' >> setHeader' "location" u >>  status' multipleChoices300
-
+    UniqueRepresentation          -> do when (method == GET) (runHandler handler)
+                                        setContentTypeHeader contentType
+                                        status' ok200
 
 handleGetHeadNonExisting :: RestM ()
 handleGetHeadNonExisting = handleNonExisting
