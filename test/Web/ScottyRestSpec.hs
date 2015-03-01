@@ -76,9 +76,10 @@ spec = do
           request "OPTIONS" "/" [] "" `shouldRespondWith` "" {matchHeaders = expectedHeaders}
 
     describe "Custom OPTIONS handler" $
-      withApp (Rest.rest "/" Rest.defaultConfig {optionsHandler = return (Just (text "xyz"))}) $
+      withApp (Rest.rest "/" Rest.defaultConfig {optionsHandler = return (Just ("text/plain",text "xyz"))}) $
         it "makes sure a custom OPTIONS handler is run" $
-          request "OPTIONS" "/" [] "" `shouldRespondWith` "xyz"
+          request "OPTIONS" "/" [] ""
+            `shouldRespondWith` "xyz" {matchHeaders = ["Content-Type" <:> "text/plain"]}
 
   describe "HTTP (DELETE)" $ do
     describe "DELETE existing: Fail" $

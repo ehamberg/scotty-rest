@@ -174,7 +174,9 @@ setAllowHeader = do
 ----------------------------------------------------------------------------------------------------
 
 handleOptions :: RestM ()
-handleOptions = maybe setAllowHeader runHandler =<< fromConfig optionsHandler
+handleOptions = fromConfig optionsHandler >>= \case
+  Nothing                      -> setAllowHeader
+  (Just (contentType,handler)) -> runHandler handler >> setContentTypeHeader contentType
 
 ----------------------------------------------------------------------------------------------------
 -- Content negotiation

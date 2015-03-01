@@ -122,7 +122,7 @@ data RestConfig = RestConfig
   , languagesProvided    :: RestM (Maybe [Language])
   , charsetsProvided     :: RestM (Maybe [TL.Text])
   , deleteResource       :: RestM DeleteResult
-  , optionsHandler       :: RestM (Maybe (Handler ()))
+  , optionsHandler       :: RestM (Maybe (MediaType, Handler ()))
   , generateEtag         :: RestM (Maybe ETag)
   , expires              :: RestM (Maybe UTCTime)
   , lastModified         :: RestM (Maybe UTCTime)
