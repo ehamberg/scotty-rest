@@ -132,6 +132,7 @@ data RestConfig = RestConfig
   , multipleChoices      :: RestM Representation
   , movedPermanently     :: RestM Moved
   , movedTemporarily     :: RestM Moved
+  , variances            :: RestM [TL.Text]
   }
 
 instance Default RestConfig where
@@ -154,6 +155,7 @@ instance Default RestConfig where
                   , multipleChoices      = return UniqueRepresentation
                   , movedPermanently     = return NotMoved
                   , movedTemporarily     = return NotMoved
+                  , variances            = return []
                   }
 
 data RestException = MovedPermanently301

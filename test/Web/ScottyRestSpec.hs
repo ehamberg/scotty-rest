@@ -197,6 +197,33 @@ spec = do
         it "makes sure we get a 404 when PATCHing a never-existed resource" $
           request "PATCH" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 404}
 
+  describe "HTTP (Vary)" $ do
+    describe "Multiple content types provided" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          contentTypesProvided = return [("text/plain",text "foo"),("text/html",undefined)]
+        }) $
+        it "makes sure we get a Vary header with `Accept` when offering several content types" $ do
+          let expectedHeaders = ["Vary" <:> "Accept"]
+          request "GET" "/" [] "" `shouldRespondWith` "foo" {matchStatus = 200, matchHeaders = expectedHeaders}
+
+    describe "Multiple languages provided" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          contentTypesProvided = return [("text/plain",text "foo")],
+          languagesProvided = return (Just ["en-gb", "de"])
+        }) $
+        it "makes sure we get a Vary header with `Accept` when offering several languages" $ do
+          let expectedHeaders = ["Vary" <:> "Accept-Language"]
+          request "GET" "/" [] "" `shouldRespondWith` "foo" {matchStatus = 200, matchHeaders = expectedHeaders}
+
+    describe "Multiple charsets provided" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          contentTypesProvided = return [("text/plain",text "foo")],
+          charsetsProvided = return (Just ["ascii", "utf-8"])
+        }) $
+        it "makes sure we get a Vary header with `Accept` when offering several languages" $ do
+          let expectedHeaders = ["Vary" <:> "Accept-Charset"]
+          request "GET" "/" [] "" `shouldRespondWith` "foo" {matchStatus = 200, matchHeaders = expectedHeaders}
+
   describe "HTTP (General)" $ do
     describe "503 Not available" $
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $

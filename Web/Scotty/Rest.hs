@@ -202,9 +202,21 @@ contentNegotiationAcceptCharSet = do
   when (isJust acceptCharset) (void charset) -- evalute `charset` to force early 406 (Not acceptable)
   contentNegotiationVariances
 
--- TODO
+-- If we provide more than one content type, add `Accept` to `Vary` header. If
+-- we provide a set of languages and/or charsets, add `Accept-Language` and
+-- `Accept-Charset`, respectively, to the `Vary` header too.
 contentNegotiationVariances :: RestM ()
-contentNegotiationVariances = checkResourceExists
+contentNegotiationVariances = do
+  config <- retrieve config'
+  ctp <- contentTypesProvided config
+  lp  <- languagesProvided config
+  cp  <- charsetsProvided config
+  varyHeader <- fromConfig variances
+  let varyHeader'   = if length ctp > 1 then "Accept":varyHeader           else varyHeader
+  let varyHeader''  = if isJust lp      then "Accept-Language":varyHeader' else varyHeader'
+  let varyHeader''' = if isJust cp      then "Accept-Charset":varyHeader'' else varyHeader''
+  setHeader' "vary" . TL.intercalate ", " $ varyHeader'''
+  checkResourceExists
 
 checkResourceExists :: RestM ()
 checkResourceExists = do
