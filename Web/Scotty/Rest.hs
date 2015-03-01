@@ -245,9 +245,11 @@ handleGetHeadExisting = do
   addLastModifiedHeader
   addExpiresHeader
   (contentType,handler) <- preferred
-  runHandler handler
-  setContentTypeHeader contentType
-  -- TODO: multiple choices
+  fromConfig multipleChoices >>= \case
+    UniqueRepresentation          -> runHandler handler >> setContentTypeHeader contentType >> status' ok200
+    MultipleRepresentations t' c' -> writeContent t' c' >> status' multipleChoices300
+    MultipleWithPreferred t' c' u -> writeContent t' c' >> setHeader' "location" u >>  status' multipleChoices300
+
 
 handleGetHeadNonExisting :: RestM ()
 handleGetHeadNonExisting = handleNonExisting
