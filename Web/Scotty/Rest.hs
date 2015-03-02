@@ -459,7 +459,8 @@ eTagMatches given onTrue onFalse = do
                      then onTrue
                      else onFalse
     where eTagMatch :: ETag -> TL.Text -> Bool
-          eTagMatch = undefined
+          eTagMatch (Strong t) = (==) ("\"" <> t <> "\"")
+          eTagMatch (Weak t)   = (==) ("\"" <> t <> "\"")
 
 parseHeaderDate :: TL.Text -> Maybe UTCTime
 parseHeaderDate hdr = do
