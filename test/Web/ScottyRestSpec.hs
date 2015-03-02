@@ -27,6 +27,48 @@ spec :: Spec
 spec = do
   let withApp = with . scottyAppT id id
 
+  describe "Conditional requests" $ do
+    describe "If-Match" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                allowedMethods = return [DELETE]
+              }) $
+        it "makes sure we get a 412 Precondition Failed when e-tag does not match" $
+          request "DELETE" "/" [("if-match","")] "" `shouldRespondWith` 412
+
+    describe "If-None-Match" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                allowedMethods = return [DELETE],
+                generateEtag = return (Just (Rest.Strong "foo"))
+              }) $
+        it "makes sure we get a 412 Precondition Failed for DELETE when e-tag matches" $
+          request "DELETE" "/" [("if-none-match","\"foo\"")] "" `shouldRespondWith` 412
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",undefined)],
+                generateEtag = return (Just (Rest.Strong "foo"))
+              }) $
+        it "makes sure we get a 304 Not Changed for GET when e-tag matches" $
+          request "GET" "/" [("if-none-match","\"foo\"")] "" `shouldRespondWith` 304
+
+    describe "If-Unmodified-Since" $ do
+      let time = read" 2015-01-01 12:00:00.000000 UTC"
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",undefined)],
+                lastModified = return (Just time)
+              }) $
+        it "makes sure we get a 412 Not Changed when not modified since given date" $
+          request "GET" "/" [("if-unmodified-since","Thu, 31 May 2014 20:00:00 GMT")] "" `shouldRespondWith` 412
+
+    describe "If-Modified-Since" $ do
+      let time = read" 2015-01-01 12:00:00.000000 UTC"
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",undefined)],
+                lastModified = return (Just time)
+              }) $
+        it "makes sure we get a 304 Not Changed when not modified since given date" $
+          request "GET" "/" [("if-modified-since","Thu, 31 May 2015 20:00:00 GMT")] "" `shouldRespondWith` 304
+
+
   describe "ETag/Expires/Last-Modified headers" $ do
     describe "ETag" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
