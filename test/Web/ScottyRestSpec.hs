@@ -44,11 +44,25 @@ spec = do
           request "DELETE" "/" [("if-none-match","\"foo\"")] "" `shouldRespondWith` 412
 
       withApp (Rest.rest "/" Rest.defaultConfig {
+                allowedMethods = return [DELETE],
+                generateEtag = return (Just (Rest.Strong "foo"))
+              }) $
+        it "makes sure we get a 412 Precondition Failed for DELETE when e-tag matches" $
+          request "DELETE" "/" [("if-none-match","\"foo\", \"bar\"")] "" `shouldRespondWith` 412
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
                 contentTypesProvided = return [("text/html",undefined)],
                 generateEtag = return (Just (Rest.Strong "foo"))
               }) $
         it "makes sure we get a 304 Not Changed for GET when e-tag matches" $
           request "GET" "/" [("if-none-match","\"foo\"")] "" `shouldRespondWith` 304
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",undefined)],
+                generateEtag = return (Just (Rest.Strong "bar"))
+              }) $
+        it "makes sure we get a 304 Not Changed for GET when e-tag matches" $
+          request "GET" "/" [("if-none-match","\"foo\", \"bar\"")] "" `shouldRespondWith` 304
 
     describe "If-Unmodified-Since" $ do
       let time = read" 2015-01-01 12:00:00.000000 UTC"
