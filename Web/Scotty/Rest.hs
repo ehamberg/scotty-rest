@@ -243,6 +243,7 @@ checkResourceExists = do
 
 handleGetHeadExisting :: RestM ()
 handleGetHeadExisting = do
+  cond
   addEtagHeader
   addLastModifiedHeader
   addExpiresHeader
