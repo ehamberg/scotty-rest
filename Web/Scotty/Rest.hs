@@ -374,7 +374,7 @@ condIfMatch = header' "if-match" >>= \case
   Just hdr -> eTagMatches hdr condIfUnmodifiedSince (stopWith PreconditionFailed412)
 
 condIfUnmodifiedSince :: RestM ()
-condIfUnmodifiedSince = checkModificationHeader "if-unmodified-since" >>= \case
+condIfUnmodifiedSince = modifiedSinceHeaderDate "if-unmodified-since" >>= \case
        Nothing    -> condIfNoneMatch -- If there are any errors: continue
        Just False -> condIfNoneMatch
        Just True  -> stopWith PreconditionFailed412
@@ -382,13 +382,13 @@ condIfUnmodifiedSince = checkModificationHeader "if-unmodified-since" >>= \case
 condIfNoneMatch :: RestM ()
 condIfNoneMatch = header' "if-none-match" >>= \case
   Nothing  -> condIfModifiedSince
-  Just hdr -> eTagMatches hdr condIfModifiedSince match
+  Just hdr -> eTagMatches hdr match condIfModifiedSince
     where match = methodIs [GET, HEAD]
                    (addEtagHeader >> addExpiresHeader >> stopWith NotModified304)
                    (stopWith PreconditionFailed412)
 
 condIfModifiedSince :: RestM ()
-condIfModifiedSince = checkModificationHeader "if-modified-since" >>= \case
+condIfModifiedSince = modifiedSinceHeaderDate "if-modified-since" >>= \case
        Nothing    -> return ()
        Just False -> (addEtagHeader >> addExpiresHeader >> stopWith NotModified304)
        Just True  -> return ()
@@ -413,12 +413,12 @@ addExpiresHeader = expiryTime >>= \case
     Nothing  -> return ()
     Just t   -> setHeader' "expires" (toHttpDateHeader t)
 
-checkModificationHeader :: TL.Text -> RestM (Maybe Bool)
-checkModificationHeader hdr = runMaybeT $ do
-    modDate   <- MaybeT modificationDate
-    hdrDate   <- MaybeT (header' hdr)
-    unmodDate <- MaybeT (return (parseHeaderDate hdrDate))
-    return (modDate > unmodDate)
+modifiedSinceHeaderDate :: TL.Text -> RestM (Maybe Bool)
+modifiedSinceHeaderDate hdr = runMaybeT $ do
+    modDate    <- MaybeT modificationDate
+    headerText <- MaybeT (header' hdr)
+    headerDate <- MaybeT (return (parseHeaderDate headerText))
+    return (modDate > headerDate)
 
 handleNonExisting :: RestM ()
 handleNonExisting = do
