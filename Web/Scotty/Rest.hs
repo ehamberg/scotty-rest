@@ -378,7 +378,7 @@ condIfMatch = header' "if-match" >>= \case
   Nothing  -> condIfUnmodifiedSince
   Just hdr -> ifEtagMatches hdr
                 condIfUnmodifiedSince
-                (stopWith PreconditionFailed412)
+                (addEtagHeader >> stopWith PreconditionFailed412)
 
 condIfUnmodifiedSince :: RestM ()
 condIfUnmodifiedSince = modifiedSinceHeaderDate "if-unmodified-since" >>= \case
@@ -394,7 +394,7 @@ condIfNoneMatch = header' "if-none-match" >>= \case
                 condIfModifiedSince
     where match = ifMethodIs [GET, HEAD]
                    notModified
-                   (stopWith PreconditionFailed412)
+                   (addEtagHeader >> stopWith PreconditionFailed412)
 
 condIfModifiedSince :: RestM ()
 condIfModifiedSince = modifiedSinceHeaderDate "if-modified-since" >>= \case
