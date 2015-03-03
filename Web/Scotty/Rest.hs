@@ -244,9 +244,7 @@ checkResourceExists = do
 handleGetHeadExisting :: RestM ()
 handleGetHeadExisting = do
   cond
-  addEtagHeader
-  addLastModifiedHeader
-  addExpiresHeader
+  addCacheHeaders
   method <- requestMethod
   (contentType,handler) <- preferred
   fromConfig multipleChoices >>= \case
@@ -406,10 +404,15 @@ condIfModifiedSince = modifiedSinceHeaderDate "if-modified-since" >>= \case
 -- Helpers
 ----------------------------------------------------------------------------------------------------
 
+addCacheHeaders :: RestM ()
+addCacheHeaders = do
+  addEtagHeader
+  addLastModifiedHeader
+  addExpiresHeader
+
 notModified :: RestM ()
 notModified = do
-  addEtagHeader
-  addExpiresHeader
+  addCacheHeaders
   stopWith NotModified304
 
 addEtagHeader :: RestM ()
