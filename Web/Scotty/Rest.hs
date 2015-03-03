@@ -274,7 +274,9 @@ handlePutPostPatchNonExisting :: RestM ()
 handlePutPostPatchNonExisting = do
   -- If there is an if-match header, the precondition failed since the resource doesn't exist
   liftM isJust (header' "if-match") >>= (`when` stopWith PreconditionFailed412)
-  methodIs [POST, PATCH] ppppreviouslyExisted pppmethodIsPut
+  ifMethodIs [POST, PATCH]
+    ppppreviouslyExisted
+    pppmethodIsPut
 
 ppppreviouslyExisted :: RestM ()
 ppppreviouslyExisted = do
@@ -286,13 +288,15 @@ ppppreviouslyExisted = do
 pppmovedPermanentlyOrTemporarily :: RestM ()
 pppmovedPermanentlyOrTemporarily = do
   moved
-  methodIs [POST] (allowsMissingPost acceptResource (stopWith Gone410)) pppmethodIsPut
+  ifMethodIs [POST]
+    (allowsMissingPost acceptResource (stopWith Gone410))
+    pppmethodIsPut
 
 pppmethodIsPost :: RestM ()
 pppmethodIsPost =
-  {- if -}   methodIs [POST]
-  {- then -} (allowsMissingPost pppmethodIsPut (stopWith NotFound404))
-  {- else -} (stopWith NotFound404)
+  ifMethodIs [POST]
+    (allowsMissingPost pppmethodIsPut (stopWith NotFound404))
+    (stopWith NotFound404)
 
 pppmethodIsPut :: RestM ()
 pppmethodIsPut = do
@@ -372,7 +376,9 @@ cond = condIfMatch
 condIfMatch :: RestM ()
 condIfMatch = header' "if-match" >>= \case
   Nothing  -> condIfUnmodifiedSince
-  Just hdr -> eTagMatches hdr condIfUnmodifiedSince (stopWith PreconditionFailed412)
+  Just hdr -> ifEtagMatches hdr
+                condIfUnmodifiedSince
+                (stopWith PreconditionFailed412)
 
 condIfUnmodifiedSince :: RestM ()
 condIfUnmodifiedSince = modifiedSinceHeaderDate "if-unmodified-since" >>= \case
@@ -383,8 +389,10 @@ condIfUnmodifiedSince = modifiedSinceHeaderDate "if-unmodified-since" >>= \case
 condIfNoneMatch :: RestM ()
 condIfNoneMatch = header' "if-none-match" >>= \case
   Nothing  -> condIfModifiedSince
-  Just hdr -> eTagMatches hdr match condIfModifiedSince
-    where match = methodIs [GET, HEAD]
+  Just hdr -> ifEtagMatches hdr
+                match
+                condIfModifiedSince
+    where match = ifMethodIs [GET, HEAD]
                    (addEtagHeader >> addExpiresHeader >> stopWith NotModified304)
                    (stopWith PreconditionFailed412)
 
@@ -436,8 +444,8 @@ handleNonExisting = do
 setContentTypeHeader :: MediaType -> RestM ()
 setContentTypeHeader = setHeader' "content-type" . convertString . renderHeader
 
-methodIs :: [StdMethod] -> RestM () -> RestM () -> RestM ()
-methodIs ms onTrue onFalse = do
+ifMethodIs :: [StdMethod] -> RestM () -> RestM () -> RestM ()
+ifMethodIs ms onTrue onFalse = do
   method <- requestMethod
   if method `elem` ms
      then onTrue
@@ -450,8 +458,8 @@ allowsMissingPost onTrue onFalse = do
      then onTrue
      else onFalse
 
-eTagMatches :: TL.Text -> RestM () -> RestM () -> RestM ()
-eTagMatches given onTrue onFalse = do
+ifEtagMatches :: TL.Text -> RestM () -> RestM () -> RestM ()
+ifEtagMatches given onTrue onFalse = do
   tag <- eTag
   case tag of
        Nothing -> onFalse
