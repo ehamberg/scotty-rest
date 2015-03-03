@@ -393,18 +393,24 @@ condIfNoneMatch = header' "if-none-match" >>= \case
                 match
                 condIfModifiedSince
     where match = ifMethodIs [GET, HEAD]
-                   (addEtagHeader >> addExpiresHeader >> stopWith NotModified304)
+                   notModified
                    (stopWith PreconditionFailed412)
 
 condIfModifiedSince :: RestM ()
 condIfModifiedSince = modifiedSinceHeaderDate "if-modified-since" >>= \case
        Nothing    -> return ()
-       Just False -> (addEtagHeader >> addExpiresHeader >> stopWith NotModified304)
+       Just False -> notModified
        Just True  -> return ()
 
 ----------------------------------------------------------------------------------------------------
 -- Helpers
 ----------------------------------------------------------------------------------------------------
+
+notModified :: RestM ()
+notModified = do
+  addEtagHeader
+  addExpiresHeader
+  stopWith NotModified304
 
 addEtagHeader :: RestM ()
 addEtagHeader = eTag >>= \case
