@@ -384,7 +384,7 @@ condIfUnmodifiedSince :: RestM ()
 condIfUnmodifiedSince = modifiedSinceHeaderDate "if-unmodified-since" >>= \case
        Nothing    -> condIfNoneMatch -- If there are any errors: continue
        Just False -> condIfNoneMatch
-       Just True  -> stopWith PreconditionFailed412
+       Just True  -> addLastModifiedHeader >> stopWith PreconditionFailed412
 
 condIfNoneMatch :: RestM ()
 condIfNoneMatch = header' "if-none-match" >>= \case
