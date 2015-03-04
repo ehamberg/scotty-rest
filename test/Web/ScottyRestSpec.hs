@@ -16,6 +16,7 @@ import           Web.Scotty.Trans hiding (delete, get, patch, post, put, request
 import Control.Monad           (liftM)
 import Data.ByteString.Char8   (pack)
 import Data.String.Conversions (cs)
+import Data.Text.Lazy          (intercalate)
 
 instance Arbitrary Rest.StdMethod where
   arbitrary = elements (enumFromTo minBound maxBound)
@@ -305,7 +306,7 @@ spec = do
           app <- scottyAppT id id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
           let known = [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
           let check = if | m `notElem` known -> (`shouldRespondWith` 501)
-                         | m `notElem` ms    -> (`shouldRespondWith` 405)
+                         | m `notElem` ms    -> (`shouldRespondWith` 405 {matchHeaders = ["allow" <:> (cs . intercalate ", " . map (cs . show)) ms]})
                          | otherwise         -> \_ -> return ()
           let waiSession = check (request ((pack . show) m) "/" [] "")
           runWaiSession waiSession app
