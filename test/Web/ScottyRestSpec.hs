@@ -354,6 +354,24 @@ spec = do
 
     describe "300: Multiple Representations" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
+          contentTypesProvided = return [("text/html",text "xxx")],
+          multipleChoices = return (Rest.MultipleRepresentations "text/plain" "foo")
+        }) $
+        it "makes sure we get a 300 with a body when there are multiple representations" $ do
+          let expectedHeaders = ["Content-Type" <:> "text/plain"]
+          request "GET" "/" [] ""
+            `shouldRespondWith` "foo" {matchStatus = 300, matchHeaders = expectedHeaders}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          contentTypesProvided = return [("text/html",text "xxx")],
+          multipleChoices = return (Rest.MultipleRepresentations "text/plain" "foo")
+        }) $
+        it "makes sure we get a 300 without a body for HEAD when there are multiple representations" $ do
+          let expectedHeaders = ["Content-Type" <:> "text/plain"]
+          request "HEAD" "/" [] ""
+            `shouldRespondWith` "" {matchStatus = 300, matchHeaders = expectedHeaders}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [PUT],
           contentTypesProvided = return [("text/html",undefined)],
           contentTypesAccepted = return [("application/json",return (Rest.SucceededWithContent "text/plain" "xxx"))],
