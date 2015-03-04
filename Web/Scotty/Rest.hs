@@ -338,7 +338,10 @@ acceptResource = do
     where locationAndResponseCode url response = setHeader' "location" url >> status' response
 
 writeContent :: MediaType -> TL.Text -> RestM ()
-writeContent t c = setContentTypeHeader t >> (raw' . convertString) c
+writeContent t c = do
+  method <- requestMethod
+  setContentTypeHeader t
+  when (method /= HEAD) ((raw' . convertString) c)
 
 resourceWithContent :: MediaType -> TL.Text -> RestM ()
 resourceWithContent t c = fromConfig multipleChoices >>= \case
