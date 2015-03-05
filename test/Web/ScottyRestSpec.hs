@@ -56,6 +56,15 @@ spec = do
             `shouldRespondWith` 412 {matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",text "foo")],
+                generateEtag = return (Just (Rest.Strong "foo"))
+              }) $
+        it "makes sure we get a 304 Not Changed for GET when e-tag matches" $ do
+          let expectedHeaders = ["Etag" <:> "\"foo\""]
+          request "GET" "/" [("if-none-match","\"bar\"")] ""
+            `shouldRespondWith` 200 {matchHeaders = expectedHeaders}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
                 contentTypesProvided = return [("text/html",undefined)],
                 generateEtag = return (Just (Rest.Strong "foo"))
               }) $
