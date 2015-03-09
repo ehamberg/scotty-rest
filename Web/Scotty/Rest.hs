@@ -60,7 +60,7 @@ defaultConfig = def
 -- >     }
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern $ do
-  initialState <- emptyHanderState config
+  initialState <- emptyHandlerState config
   let run = runReaderT (runRestM restHandlerStart) initialState
   run `rescue` handleExcept
 

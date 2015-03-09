@@ -19,7 +19,7 @@ module Web.Scotty.Rest.Types
   , RestConfig(..)
   , RestException(..)
   , Url
-  , emptyHanderState
+  , emptyHandlerState
   -- * Lenses for request state's fields
   , config'
   , method'
@@ -85,8 +85,8 @@ data DeleteResult = NotDeleted
                   deriving Eq
 data Authorized = Authorized | NotAuthorized Challenge
 
-emptyHanderState :: RestConfig -> ActionT RestException IO HandlerState
-emptyHanderState config = do
+emptyHandlerState :: RestConfig -> ActionT RestException IO HandlerState
+emptyHandlerState config = do
   method      <- liftIO newEmtpyCachedVar
   handler     <- liftIO newEmtpyCachedVar
   language    <- liftIO newEmtpyCachedVar
