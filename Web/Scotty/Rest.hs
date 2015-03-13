@@ -497,6 +497,7 @@ parseHeaderDate hdr = do
       time = secondsToDiffTime . fromIntegral $ h*60*60 + m*60 + s
   return $ UTCTime date time
 
+-- | Formats a 'UTCTime' as a HTTP date, e.g. /Sun, 06 Nov 1994 08:49:37 GMT/.
 toHttpDateHeader :: UTCTime -> TL.Text
 toHttpDateHeader = convertString . formatHTTPDate . epochTimeToHTTPDate . convert
 
