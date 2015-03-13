@@ -65,7 +65,6 @@ newtype RestM a = RestM
 type Handler = ActionT RestException IO
 
 type Url = TL.Text
-type Challenge = TL.Text
 
 data Moved = NotMoved | MovedTo Url
 data ETag = Strong TL.Text
@@ -83,7 +82,11 @@ data DeleteResult = NotDeleted
                   | DeleteEnacted -- accepted for processing, but the processing has not been completed (and may never be)
                   | DeletedWithResponse MediaType TL.Text
                   deriving Eq
-data Authorized = Authorized | NotAuthorized Challenge
+
+-- | Response to 'isAuthorized' callback.
+data Authorized = Authorized            -- ^ User is authenticated and authorized.
+                | NotAuthorized TL.Text -- ^ User is not authorized. The given challenge will be
+                                        --   sent as part of the /WWW-Authenticate/ header.
 
 emptyHandlerState :: RestConfig -> ActionT RestException IO HandlerState
 emptyHandlerState config = do
