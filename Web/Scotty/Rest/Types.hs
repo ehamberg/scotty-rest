@@ -16,10 +16,10 @@ module Web.Scotty.Rest.Types
   , Representation (..)
   -- * Internal data types
   , Handler
+  , HandlerState(..)
   , RestConfig(..)
   , RestException(..)
   , Url
-  , emptyHandlerState
   -- * Lenses for request state's fields
   , config'
   , method'
@@ -87,19 +87,6 @@ data DeleteResult = NotDeleted
 data Authorized = Authorized            -- ^ User is authenticated and authorized.
                 | NotAuthorized TL.Text -- ^ User is not authorized. The given challenge will be
                                         --   sent as part of the /WWW-Authenticate/ header.
-
-emptyHandlerState :: RestConfig -> ActionT RestException IO HandlerState
-emptyHandlerState config = do
-  method      <- liftIO newEmtpyCachedVar
-  handler     <- liftIO newEmtpyCachedVar
-  language    <- liftIO newEmtpyCachedVar
-  charset     <- liftIO newEmtpyCachedVar
-  tag         <- liftIO newEmtpyCachedVar
-  expiry      <- liftIO newEmtpyCachedVar
-  modified    <- liftIO newEmtpyCachedVar
-  available   <- liftIO newEmtpyCachedVar
-  now         <- liftIO newEmtpyCachedVar
-  return (HandlerState config method handler language charset tag expiry modified available now)
 
 data HandlerState = HandlerState
   {

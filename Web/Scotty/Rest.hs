@@ -27,6 +27,7 @@ module Web.Scotty.Rest
 
 import BasePrelude hiding (Handler)
 
+import Web.Scotty.Rest.Internal.CachedVar
 import Web.Scotty.Rest.Types
 
 import           Control.Monad.Reader      (runReaderT)
@@ -60,9 +61,17 @@ defaultConfig = def
 -- >     }
 rest :: RoutePattern -> RestConfig -> ScottyT RestException IO ()
 rest pattern config = matchAny pattern $ do
-  initialState <- emptyHandlerState config
-  let run = runReaderT (runRestM restHandlerStart) initialState
+  let run = runReaderT (runRestM restHandlerStart) =<< emptyHandlerState
   run `rescue` handleExcept
+    where emptyHandlerState = lift $ HandlerState config <$> newEmtpyCachedVar
+                                                         <*> newEmtpyCachedVar
+                                                         <*> newEmtpyCachedVar
+                                                         <*> newEmtpyCachedVar
+                                                         <*> newEmtpyCachedVar
+                                                         <*> newEmtpyCachedVar
+                                                         <*> newEmtpyCachedVar
+                                                         <*> newEmtpyCachedVar
+                                                         <*> newEmtpyCachedVar
 
 preferred :: RestM (MediaType,Handler ())
 preferred = computeOnce handler' $ do
