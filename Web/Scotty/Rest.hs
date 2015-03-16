@@ -164,7 +164,9 @@ restHandlerStart = do
     setAllowHeader
     stopWith MethodNotAllowed405
 
-  -- TODO: Is the request malformed?
+  -- Is the request malformed?
+  isMalformed <- fromConfig malformedRequest
+  when isMalformed (stopWith BadRequest400)
 
   -- Is the client authorized?
   fromConfig isAuthorized >>= \case

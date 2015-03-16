@@ -325,6 +325,11 @@ spec = do
         it "makes sure we get a 501 when using an unimplemented method" $
           request "CONNECT" "/" [] "" `shouldRespondWith` 501
 
+    describe "400 Bad Request" $
+      withApp (Rest.rest "/" Rest.defaultConfig {malformedRequest = return True}) $
+        it "makes sure we get a 400 when request is considered malformed" $
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 400}
+
     describe "401 Unauthorized" $
       withApp (Rest.rest "/" Rest.defaultConfig {isAuthorized = return (Rest.NotAuthorized "Basic")}) $
         it "makes sure we get a 401 when access is not authorized" $

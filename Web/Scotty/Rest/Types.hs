@@ -119,6 +119,8 @@ data RestConfig = RestConfig
   , generateEtag         :: RestM (Maybe ETag)
   , expires              :: RestM (Maybe UTCTime)
   , lastModified         :: RestM (Maybe UTCTime)
+  -- | If 'True', the request is considered malformed and a /400 Bad Request/ is returned.
+  , malformedRequest     :: RestM Bool
   , isAuthorized         :: RestM Authorized
   -- | If 'True', access to this resource is forbidden, and /403 Forbidden/ is returned.
   --
@@ -146,6 +148,7 @@ instance Default RestConfig where
                   , generateEtag         = return Nothing
                   , expires              = return Nothing
                   , lastModified         = return Nothing
+                  , malformedRequest     = return False
                   , isAuthorized         = return Authorized
                   , forbidden            = return False
                   , serviceAvailable     = return True
