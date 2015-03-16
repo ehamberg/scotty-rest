@@ -131,6 +131,12 @@ data RestConfig = RestConfig
   , multipleChoices      :: RestM Representation
   , movedPermanently     :: RestM Moved
   , movedTemporarily     :: RestM Moved
+  -- | Returns a list of header names that should be included in a given response's /Vary/ header.
+  -- The standard content negotiation headers (/Accept/, /Accept-Encoding/, /Accept-Charset/,
+  -- /Accept-Language/) do not need to be specified here as they will be added automatically when
+  -- e.g.  several content types are provided.
+  --
+  -- Default: @[]@
   , variances            :: RestM [TL.Text]
   }
 
