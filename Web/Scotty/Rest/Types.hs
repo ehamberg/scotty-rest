@@ -120,8 +120,7 @@ data RestConfig = RestConfig
   , expires              :: RestM (Maybe UTCTime)
   , lastModified         :: RestM (Maybe UTCTime)
   , isAuthorized         :: RestM Authorized
-  -- | If 'True', access to this resource is forbidden, and /403 Forbidden/ is
-  -- returned.
+  -- | If 'True', access to this resource is forbidden, and /403 Forbidden/ is returned.
   --
   -- Default: 'False'.
   , forbidden            :: RestM Bool
