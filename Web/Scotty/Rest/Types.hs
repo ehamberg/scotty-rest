@@ -117,6 +117,11 @@ data RestConfig = RestConfig
   , expires              :: RestM (Maybe UTCTime)
   , lastModified         :: RestM (Maybe UTCTime)
   , isAuthorized         :: RestM Authorized
+  -- | If 'True', access to this resource is forbidden, and /403 Forbidden/ is
+  -- returned.
+  --
+  -- Default: 'False'.
+  , forbidden            :: RestM Bool
   , serviceAvailable     :: RestM Bool
   , allowMissingPost     :: RestM Bool
   , multipleChoices      :: RestM Representation
@@ -140,6 +145,7 @@ instance Default RestConfig where
                   , expires              = return Nothing
                   , lastModified         = return Nothing
                   , isAuthorized         = return Authorized
+                  , forbidden            = return False
                   , serviceAvailable     = return True
                   , allowMissingPost     = return True
                   , multipleChoices      = return UniqueRepresentation
@@ -153,6 +159,7 @@ data RestException = MovedPermanently301
                    | MovedTemporarily307
                    | BadRequest400
                    | Unauthorized401
+                   | Forbidden403
                    | NotFound404
                    | NotAcceptable406
                    | Conflict409

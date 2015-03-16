@@ -165,7 +165,10 @@ restHandlerStart = do
        Authorized                -> return ()
        (NotAuthorized challenge) -> setHeader' "WWW-Authenticate" challenge >> stopWith Unauthorized401
 
-  -- TODO: Is the client forbidden to access this resource?
+  -- Is the client forbidden to access this resource?
+  isForbidden <- fromConfig forbidden
+  when isForbidden (stopWith Forbidden403)
+
   -- TODO: Are the content headers valid?
   -- TODO: Is the entity length valid?
 
@@ -535,6 +538,7 @@ handleExcept NotModified304          = status notModified304
 handleExcept MovedTemporarily307     = status temporaryRedirect307
 handleExcept BadRequest400           = status badRequest400
 handleExcept Unauthorized401         = status unauthorized401
+handleExcept Forbidden403            = status forbidden403
 handleExcept NotFound404             = status notFound404
 handleExcept MethodNotAllowed405     = status methodNotAllowed405
 handleExcept NotAcceptable406        = status notAcceptable406

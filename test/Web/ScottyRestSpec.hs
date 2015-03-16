@@ -330,6 +330,11 @@ spec = do
         it "makes sure we get a 401 when access is not authorized" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 401, matchHeaders = ["WWW-Authenticate" <:> "Basic"]}
 
+    describe "403 Forbidden" $
+      withApp (Rest.rest "/" Rest.defaultConfig {forbidden = return True}) $
+        it "makes sure we get a 403 when access is forbidden" $
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 403}
+
     describe "404 Not Found" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
