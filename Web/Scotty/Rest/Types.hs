@@ -102,6 +102,9 @@ data HandlerState = HandlerState
   , _now          :: !(CachedVar UTCTime)
   }
 
+-- | The callbacks that control a handler's behaviour.
+-- 'Scotty.Rest.defaultConfig' returns a 'RestConfig' with default values. For
+-- typical handlers, you only need to override a few of these callbacks.
 data RestConfig = RestConfig
   { allowedMethods       :: RestM [StdMethod]
   , resourceExists       :: RestM Bool
