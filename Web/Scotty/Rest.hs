@@ -48,9 +48,6 @@ import           Network.HTTP.Types.Status
 import qualified Network.Wai               as Wai
 import           Web.Scotty.Trans
 
-defaultConfig :: RestConfig
-defaultConfig = def
-
 -- | /rest/ is used where you would use e.g. 'get' in your Scotty app, and
 -- will match any method:
 --
@@ -72,6 +69,15 @@ rest pattern config = matchAny pattern $ do
                                                          <*> newEmtpyCachedVar
                                                          <*> newEmtpyCachedVar
                                                          <*> newEmtpyCachedVar
+
+-- | A 'RestConfig' with default values. To override one or more fields, use
+-- record syntax:
+--
+-- > defaultConfig {
+-- >   contentTypesProvided = return [("text/html",html "Hello, World!")]
+-- > }
+defaultConfig :: RestConfig
+defaultConfig = def
 
 preferred :: RestM (MediaType,Handler ())
 preferred = computeOnce handler' $ do
