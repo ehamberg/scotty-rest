@@ -277,12 +277,11 @@ handleGetHeadExisting = do
 handleGetHeadNonExisting :: RestM ()
 handleGetHeadNonExisting = handleNonExisting
 
-moved :: RestM ()
-moved = do
-  fromConfig movedPermanently >>= moved' MovedPermanently301
-  fromConfig movedTemporarily >>= moved' MovedTemporarily307
-    where moved' _ NotMoved      = return ()
-          moved' e (MovedTo url) = setHeader' "location" url >> stopWith e
+checkMoved :: RestM ()
+checkMoved = fromConfig resourceMoved >>= \case
+  NotMoved               -> return ()
+  (MovedPermanently url) -> setHeader' "location" url >> stopWith MovedPermanently301
+  (MovedTemporarily url) -> setHeader' "location" url >> stopWith MovedTemporarily307
 
 ----------------------------------------------------------------------------------------------------
 -- PUT/POST/PATCH
@@ -305,7 +304,7 @@ ppppreviouslyExisted = do
 
 pppmovedPermanentlyOrTemporarily :: RestM ()
 pppmovedPermanentlyOrTemporarily = do
-  moved
+  checkMoved
   ifMethodIs [POST]
     (allowsMissingPost acceptResource (stopWith Gone410))
     pppmethodIsPut
@@ -470,7 +469,7 @@ handleNonExisting = do
   existed <- fromConfig previouslyExisted
   unless existed (stopWith NotFound404)
 
-  moved
+  checkMoved
   stopWith Gone410
 
 setContentTypeHeader :: MediaType -> RestM ()

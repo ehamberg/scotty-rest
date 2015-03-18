@@ -416,7 +416,7 @@ spec = do
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
           previouslyExisted = return True,
-          movedPermanently = return (Rest.MovedTo "xxx"),
+          resourceMoved = return (Rest.MovedPermanently "xxx"),
           contentTypesProvided = return [("text/html",undefined)]
         }) $
         it "makes sure we get a 301 when a resource existed before and is moved permanently" $
@@ -426,7 +426,7 @@ spec = do
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
           previouslyExisted = return True,
-          movedTemporarily = return (Rest.MovedTo "xxx"),
+          resourceMoved = return (Rest.MovedTemporarily "xxx"),
           contentTypesProvided = return [("text/html",undefined)]
         }) $
         it "makes sure we get a 307 when a resource existed before and is moved temporarily" $

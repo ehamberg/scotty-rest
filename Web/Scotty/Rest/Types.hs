@@ -66,7 +66,10 @@ type Handler = ActionT RestException IO
 
 type Url = TL.Text
 
-data Moved = NotMoved | MovedTo Url
+data Moved = NotMoved
+           | MovedTemporarily Url
+           | MovedPermanently Url
+
 data ETag = Strong TL.Text
           | Weak TL.Text
 data ProcessingResult = Succeeded
@@ -129,8 +132,7 @@ data RestConfig = RestConfig
   , serviceAvailable     :: RestM Bool
   , allowMissingPost     :: RestM Bool
   , multipleChoices      :: RestM Representation
-  , movedPermanently     :: RestM Moved
-  , movedTemporarily     :: RestM Moved
+  , resourceMoved        :: RestM Moved
   , variances            :: RestM [TL.Text]
   }
 
@@ -154,8 +156,7 @@ instance Default RestConfig where
                   , serviceAvailable     = return True
                   , allowMissingPost     = return True
                   , multipleChoices      = return UniqueRepresentation
-                  , movedPermanently     = return NotMoved
-                  , movedTemporarily     = return NotMoved
+                  , resourceMoved        = return NotMoved
                   , variances            = return []
                   }
 
