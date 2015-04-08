@@ -1,12 +1,11 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RankNTypes        #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Web.Scotty.Rest.Types
   (
-    RestM(..)
+    RestM
   -- * Callbacks result types
   , Authorized(..)
   , DeleteResult(..)
@@ -14,55 +13,28 @@ module Web.Scotty.Rest.Types
   , Moved(..)
   , ProcessingResult(..)
   , Representation (..)
-  -- * Internal data types
-  , Handler
-  , HandlerState(..)
   , RestConfig(..)
   , RestException(..)
   , Url
-  -- * Lenses for request state's fields
-  , config'
-  , method'
-  , handler'
-  , language'
-  , charset'
-  , eTag'
-  , expires'
-  , lastModified'
-  , isAvailable'
-  , now'
-  -- * Lens helpers
-  , store
-  , retrieve
-  , computeOnce
-  , cached
-  , fromConfig
   -- * Re-exports
   , MediaType
   , Language
   , StdMethod(..)
   ) where
 
-import Web.Scotty.Rest.Internal.CachedVar
-
 import BasePrelude hiding (Handler)
 
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Reader   (MonadReader, ReaderT, ask)
+import           Control.Monad.IO.Class (MonadIO)
 import           Data.Default.Class     (Default (..), def)
 import qualified Data.Text.Lazy         as TL
 import           Data.Time.Clock        (UTCTime)
-import           Lens.Family2
-import           Lens.Family2.TH        (makeLensesBy)
 import           Network.HTTP.Media     (Language, MediaType)
 import           Network.HTTP.Types     (StdMethod (..))
-import           Web.Scotty.Trans
+import           Web.Scotty.Trans       hiding (get)
 
-newtype RestM a = RestM
-  { runRestM :: ReaderT HandlerState (ActionT RestException IO) a
-  } deriving (Functor, Applicative, Monad, MonadIO, MonadReader HandlerState)
+type RestM m = ActionT RestException m
 
-type Handler = ActionT RestException IO
+--type Handler = ActionT RestException IO
 
 type Url = TL.Text
 
@@ -91,59 +63,45 @@ data Authorized = Authorized            -- ^ User is authenticated and authorize
                 | NotAuthorized TL.Text -- ^ User is not authorized. The given challenge will be
                                         --   sent as part of the /WWW-Authenticate/ header.
 
-data HandlerState = HandlerState
-  {
-    _config       :: !RestConfig
-  , _method       :: !(CachedVar StdMethod)
-  , _handler      :: !(CachedVar (MediaType,Handler ()))
-  , _language     :: !(CachedVar (Maybe Language))
-  , _charset      :: !(CachedVar (Maybe TL.Text))
-  , _eTag         :: !(CachedVar (Maybe ETag))    -- ETag, if computed
-  , _expires      :: !(CachedVar (Maybe UTCTime)) -- Expiry time, if computed
-  , _lastModified :: !(CachedVar (Maybe UTCTime)) -- Last modified, if computed
-  , _isAvailable  :: !(CachedVar Bool)
-  , _now          :: !(CachedVar UTCTime)
-  }
-
 -- | The callbacks that control a handler's behaviour.
 -- 'Scotty.Rest.defaultConfig' returns a 'RestConfig' with default values. For
 -- typical handlers, you only need to override a few of these callbacks.
-data RestConfig = RestConfig
-  { allowedMethods       :: RestM [StdMethod]
-  , resourceExists       :: RestM Bool
-  , previouslyExisted    :: RestM Bool
-  , isConflict           :: RestM Bool
-  , contentTypesAccepted :: RestM [(MediaType, Handler ProcessingResult)]
-  , contentTypesProvided :: RestM [(MediaType, Handler ())]
-  , languagesProvided    :: RestM (Maybe [Language])
-  , charsetsProvided     :: RestM (Maybe [TL.Text])
-  , deleteResource       :: RestM DeleteResult
-  , optionsHandler       :: RestM (Maybe (MediaType, Handler ()))
-  , generateEtag         :: RestM (Maybe ETag)
-  , expires              :: RestM (Maybe UTCTime)
-  , lastModified         :: RestM (Maybe UTCTime)
+data RestConfig m = RestConfig
+  { allowedMethods       :: m [StdMethod]
+  , resourceExists       :: m Bool
+  , previouslyExisted    :: m Bool
+  , isConflict           :: m Bool
+  , contentTypesAccepted :: m [(MediaType, m ProcessingResult)]
+  , contentTypesProvided :: m [(MediaType, m ())]
+  , languagesProvided    :: m (Maybe [Language])
+  , charsetsProvided     :: m (Maybe [TL.Text])
+  , deleteResource       :: m DeleteResult
+  , optionsHandler       :: m (Maybe (MediaType, m ()))
+  , generateEtag         :: m (Maybe ETag)
+  , expires              :: m (Maybe UTCTime)
+  , lastModified         :: m (Maybe UTCTime)
   -- | If 'True', the request is considered malformed and a /400 Bad Request/ is returned.
-  , malformedRequest     :: RestM Bool
-  , isAuthorized         :: RestM Authorized
+  , malformedRequest     :: m Bool
+  , isAuthorized         :: m Authorized
   -- | If 'True', access to this resource is forbidden, and /403 Forbidden/ is returned.
   --
   -- Default: 'False'.
-  , forbidden            :: RestM Bool
-  , serviceAvailable     :: RestM Bool
-  , allowMissingPost     :: RestM Bool
-  , multipleChoices      :: RestM Representation
+  , forbidden            :: m Bool
+  , serviceAvailable     :: m Bool
+  , allowMissingPost     :: m Bool
+  , multipleChoices      :: m Representation
   -- | Default: 'NotMoved'
-  , resourceMoved        :: RestM Moved
+  , resourceMoved        :: m Moved
   -- | Returns a list of header names that should be included in a given response's /Vary/ header.
   -- The standard content negotiation headers (/Accept/, /Accept-Encoding/, /Accept-Charset/,
   -- /Accept-Language/) do not need to be specified here as they will be added automatically when
   -- e.g.  several content types are provided.
   --
   -- Default: @[]@
-  , variances            :: RestM [TL.Text]
+  , variances            :: m [TL.Text]
   }
 
-instance Default RestConfig where
+instance (MonadIO m) => Default (RestConfig m) where
  def = RestConfig { allowedMethods       = return [GET, HEAD, OPTIONS]
                   , resourceExists       = return True
                   , previouslyExisted    = return False
@@ -188,30 +146,3 @@ data RestException = MovedPermanently301
 instance ScottyError RestException where
   stringError = InternalServerError . TL.pack
   showError = fromString . show
-
-$(makeLensesBy (\n -> Just (tail n ++ "'")) ''HandlerState)
-
-store :: Lens' HandlerState (CachedVar a) -> a -> RestM ()
-store field value = do
-  state <- ask
-  liftIO $ writeCachedVar (view field state) value
-
-retrieve :: Lens' HandlerState a -> RestM a
-retrieve field = do
-  state <- ask
-  return (view field state)
-
-computeOnce :: Lens' HandlerState (CachedVar a) -> RestM a -> RestM a
-computeOnce field computation = do
-  state <- ask
-  let ref = view field state
-  contents <- liftIO $ readIORef ref
-  maybe (computation >>= liftIO . writeAndReturnCachedVar ref) return contents
-
-cached :: Lens' HandlerState (CachedVar a) -> RestM a
-cached field = do
-  state <- ask
-  liftIO $ readCachedVar (view field state)
-
-fromConfig :: (RestConfig -> RestM a) -> RestM a
-fromConfig field = retrieve config' >>= field

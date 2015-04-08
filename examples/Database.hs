@@ -1,19 +1,19 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Database where
 
-import GHC.Generics
-import Data.Foldable
-import Web.Scotty.Trans hiding (get, put)
-import Web.Scotty.Rest
-import Network.Wai.Middleware.RequestLogger
-import Data.Text.Lazy hiding (map)
-import Database.SQLite.Simple hiding (fold)
-import Control.Exception (try, SomeException)
+import Control.Exception                    (SomeException, try)
 import Control.Monad.State
 import Data.Aeson
+import Data.Foldable
+import Data.Text.Lazy                       hiding (map)
+import Database.SQLite.Simple               hiding (fold)
+import GHC.Generics
+import Network.Wai.Middleware.RequestLogger
+import Web.Scotty.Rest
+import Web.Scotty.Trans                     hiding (get, put)
 
 
 data Message = Message {
@@ -61,7 +61,7 @@ app = scottyT 7000 (`evalStateT` Nothing) (`evalStateT` Nothing) $ do
           Just conn <- lift get
           Message msg <- jsonData
           liftIO $ execute conn "INSERT INTO messages(message) VALUES (?)" (Only msg)
-          return ProcessingSucceeded
+          return Succeeded
         )
       ]
 
