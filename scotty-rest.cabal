@@ -21,6 +21,7 @@ extra-source-files:
 library
   exposed-modules: Web.Scotty.Rest
   other-modules: Web.Scotty.Rest.Types
+  hs-source-dirs:      src
 
   build-depends: base               >= 4.7   && < 4.8
                , base-prelude
