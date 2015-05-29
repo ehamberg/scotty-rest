@@ -27,7 +27,7 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  let withApp = with . scottyAppT id id
+  let withApp = with . scottyAppT id
 
   describe "Conditional requests" $ do
     describe "If-Match" $
@@ -313,7 +313,7 @@ spec = do
     describe "405 Method not allowed" $
       it "makes sure we get a 405 when method is not allowed" $
         property $ \m ms -> do
-          app <- scottyAppT id id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
+          app <- scottyAppT id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
           let known = [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
           let check = if | m `notElem` known -> (`shouldRespondWith` 501)
                          | m `notElem` ms    -> (`shouldRespondWith` 405 {matchHeaders = ["allow" <:> (cs . intercalate ", " . map (cs . show)) ms]})
@@ -540,7 +540,7 @@ spec = do
 
   describe "Custom monad" $
     describe "Server using a custom monad" $
-      (with . scottyAppT (`evalStateT` Nothing) (`evalStateT` Nothing)) (Rest.rest "/" Rest.defaultConfig {
+      (with . scottyAppT (`evalStateT` Nothing)) (Rest.rest "/" Rest.defaultConfig {
           contentTypesProvided = return [("text/plain",text "wtf")],
           contentTypesAccepted = return [("text/plain",liftM (Rest.SucceededWithContent  "text/plain" . cs) body)],
           allowedMethods = return [POST]
