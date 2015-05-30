@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes        #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module Web.Scotty.Rest.Types
   (
