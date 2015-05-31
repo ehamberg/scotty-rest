@@ -2,12 +2,12 @@
 
 module HelloWorld where
 
-import Web.Scotty.Trans
-import Web.Scotty.Rest
 import Network.Wai.Middleware.RequestLogger
+import Web.Scotty.Rest
+import Web.Scotty.Trans
 
 main :: IO ()
-main = scottyT 7000 id id $ do
+main = scottyT 3000 id $ do
   middleware logStdoutDev
   rest "/" defaultConfig {
     contentTypesProvided = return [("text/html",html "Hello, World!")]

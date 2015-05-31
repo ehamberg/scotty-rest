@@ -22,10 +22,8 @@ data Message = Message {
 
 instance FromJSON Message
 
-type ScottyRestDbM = ActionT RestException (StateT (Maybe Connection) IO)
-
 app :: IO ()
-app = scottyT 7000 (`evalStateT` Nothing) $ do
+app = scottyT 3000 (`evalStateT` Nothing) $ do
   middleware logStdoutDev
   rest "/messages" defaultConfig { allowedMethods       = allowed
                                  , serviceAvailable     = available
