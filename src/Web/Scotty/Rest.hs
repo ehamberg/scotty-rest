@@ -193,7 +193,7 @@ contentNegotiationAccept :: (MonadIO m) => Config m -> RestM m ()
 contentNegotiationAccept config = do
   accept <- header "accept"
   -- evalute `preferred` to force early 406 (Not acceptable):
-  when (isJust accept) (preferred config >> return ())
+  when (isJust accept) (void $ preferred config)
   contentNegotiationAcceptLanguage config
 
 -- If there is an `Accept-Language` header, check that we provide that
@@ -202,7 +202,7 @@ contentNegotiationAcceptLanguage :: (MonadIO m) => Config m -> RestM m ()
 contentNegotiationAcceptLanguage config = do
   acceptLanguage <- header "accept-language"
   -- evalute `language` to force early 406 (Not acceptable):
-  when (isJust acceptLanguage) (language config >> return ())
+  when (isJust acceptLanguage) (void $ language config)
   contentNegotiationAcceptCharSet config
 
 -- -- If there is an `Accept-Charset` header, check that we provide that
@@ -211,7 +211,7 @@ contentNegotiationAcceptCharSet :: (MonadIO m) => Config m -> RestM m ()
 contentNegotiationAcceptCharSet config = do
   acceptCharset <- header "accept-charset"
   -- evalute `charset` to force early 406 (Not acceptable):
-  when (isJust acceptCharset) (charset config >> return ())
+  when (isJust acceptCharset) (void $ charset config)
   contentNegotiationVariances config
 
 -- If we provide more than one content type, add `Accept` to `Vary` header. If
