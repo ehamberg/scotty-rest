@@ -59,7 +59,6 @@ data DeleteResult = NotDeleted
                   | DeleteEnacted
                   -- ^ Accepted for processing, but the processing has not been completed (and may never be).
                   | DeletedWithResponse !MediaType !TL.Text
-                  deriving Eq
 
 -- | Response to 'isAuthorized' callback.
 data Authorized = Authorized             -- ^ User is authenticated and authorized.

@@ -362,10 +362,9 @@ handleDeleteExisting :: (MonadIO m) => Config m -> RestM m ()
 handleDeleteExisting config = do
   cond config
   result <- deleteResource config
-  when (result == NotDeleted) (raise (InternalServerError "Could not delete resource"))
   case result of
        DeleteEnacted             -> status accepted202
-       DeleteCompleted           -> status noContent204
+       Deleted                   -> status noContent204
        (DeletedWithResponse t c) -> resourceWithContent config t c
        NotDeleted                -> raise (InternalServerError "Deleting existing resource failed")
 
