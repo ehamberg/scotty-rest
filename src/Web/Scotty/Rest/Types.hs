@@ -21,7 +21,7 @@ module Web.Scotty.Rest.Types
   , StdMethod(..)
   ) where
 
-import BasePrelude hiding (Handler)
+import BasePrelude
 
 import           Control.Monad.IO.Class (MonadIO)
 import           Data.Default.Class     (Default (..), def)
@@ -32,8 +32,6 @@ import           Network.HTTP.Types     (StdMethod (..))
 import           Web.Scotty.Trans       hiding (get)
 
 type RestM m = ActionT RestException m
-
---type Handler = ActionT RestException IO
 
 type Url = TL.Text
 
