@@ -38,29 +38,33 @@ type RestM m = ActionT RestException m
 type Url = TL.Text
 
 data Moved = NotMoved
-           | MovedTemporarily Url
-           | MovedPermanently Url
+           | MovedTemporarily !Url
+           | MovedPermanently !Url
 
 data ETag = Strong TL.Text
           | Weak TL.Text
+
 data ProcessingResult = Succeeded
-                      | SucceededWithContent MediaType TL.Text
-                      | SucceededWithLocation Url
-                      | Redirect Url
+                      | SucceededWithContent !MediaType !TL.Text
+                      | SucceededWithLocation !Url
+                      | Redirect !Url
                       | Failed
+
 data Representation = UniqueRepresentation
-                    | MultipleRepresentations MediaType TL.Text
-                    | MultipleWithPreferred MediaType TL.Text Url
+                    | MultipleRepresentations !MediaType !TL.Text
+                    | MultipleWithPreferred !MediaType !TL.Text !Url
+
 data DeleteResult = NotDeleted
                   | DeleteCompleted
-                  | DeleteEnacted -- accepted for processing, but the processing has not been completed (and may never be)
-                  | DeletedWithResponse MediaType TL.Text
+                  | DeleteEnacted
+                  -- ^ Accepted for processing, but the processing has not been completed (and may never be).
+                  | DeletedWithResponse !MediaType !TL.Text
                   deriving Eq
 
 -- | Response to 'isAuthorized' callback.
-data Authorized = Authorized            -- ^ User is authenticated and authorized.
-                | NotAuthorized TL.Text -- ^ User is not authorized. The given challenge will be
-                                        --   sent as part of the /WWW-Authenticate/ header.
+data Authorized = Authorized             -- ^ User is authenticated and authorized.
+                | NotAuthorized !TL.Text -- ^ User is not authorized. The given challenge will be
+                                         --   sent as part of the /WWW-Authenticate/ header.
 
 -- | The callbacks that control a handler's behaviour.
 -- 'Scotty.Rest.defaultConfig' returns a 'RestConfig' with default values. For
