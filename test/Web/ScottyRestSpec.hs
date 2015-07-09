@@ -176,7 +176,7 @@ spec = do
 
     describe "DELETE existing: Completed" $
       withApp (Rest.rest "/" Rest.defaultConfig {
-                deleteResource = return Rest.DeleteCompleted
+                deleteResource = return Rest.Deleted
               , allowedMethods = return [DELETE]
               }) $
         it "makes sure we get a 204 if delete is completed" $
