@@ -60,7 +60,7 @@ spec = do
                 contentTypesProvided = return [("text/html",text "foo")],
                 generateEtag = return (Just (Rest.Strong "foo"))
               }) $
-        it "makes sure we get a 304 Not Changed for GET when e-tag matches" $ do
+        it "makes sure we don't get a 304 Not Changed for GET when e-tag doesn't match" $ do
           let expectedHeaders = ["Etag" <:> "\"foo\""]
           request "GET" "/" [("if-none-match","\"bar\"")] ""
             `shouldRespondWith` 200 {matchHeaders = expectedHeaders}
@@ -305,84 +305,6 @@ spec = do
           request "GET" "/" [] "" `shouldRespondWith` "foo" {matchStatus = 200, matchHeaders = expectedHeaders}
 
   describe "HTTP (General)" $ do
-    describe "503 Not available" $
-      withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $
-        it "makes sure we get a 503 when serviceAvailable returns False" $
-          request "GET" "/" [] "" `shouldRespondWith` 503
-
-    describe "405 Method not allowed" $
-      it "makes sure we get a 405 when method is not allowed" $
-        property $ \m ms -> do
-          app <- scottyAppT id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
-          let known = [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
-          let check = if | m `notElem` known -> (`shouldRespondWith` 501)
-                         | m `notElem` ms    -> (`shouldRespondWith` 405 {matchHeaders = ["allow" <:> (cs . intercalate ", " . map (cs . show)) ms]})
-                         | otherwise         -> \_ -> return ()
-          let waiSession = check (request ((pack . show) m) "/" [] "")
-          runWaiSession waiSession app
-
-    describe "500 Internal Server Error" $
-      withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = raise $ stringError "XXX"}) $
-        it "makes sure we get a 500 when throwing a string error" $
-          request "GET" "/" [] "" `shouldRespondWith` 500
-
-    describe "501 Not Implemented" $
-      withApp (Rest.rest "/" Rest.defaultConfig) $
-        it "makes sure we get a 501 when using an unimplemented method" $
-          request "CONNECT" "/" [] "" `shouldRespondWith` 501
-
-    describe "400 Bad Request" $
-      withApp (Rest.rest "/" Rest.defaultConfig {malformedRequest = return True}) $
-        it "makes sure we get a 400 when request is considered malformed" $
-          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 400}
-
-    describe "401 Unauthorized" $
-      withApp (Rest.rest "/" Rest.defaultConfig {isAuthorized = return (Rest.NotAuthorized "Basic")}) $
-        it "makes sure we get a 401 when access is not authorized" $
-          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 401, matchHeaders = ["WWW-Authenticate" <:> "Basic"]}
-
-    describe "403 Forbidden" $
-      withApp (Rest.rest "/" Rest.defaultConfig {forbidden = return True}) $
-        it "makes sure we get a 403 when access is forbidden" $
-          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 403}
-
-    describe "404 Not Found" $
-      withApp (Rest.rest "/" Rest.defaultConfig {
-          resourceExists = return False,
-          contentTypesProvided = return [("text/html",undefined)]
-        }) $
-        it "makes sure we get a 404 when resource does not exist and did not exist previously" $
-          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 404}
-
-    describe "410 Gone" $
-      withApp (Rest.rest "/" Rest.defaultConfig {
-          resourceExists = return False,
-          previouslyExisted = return True,
-          allowedMethods = return [GET, POST, DELETE],
-          allowMissingPost = return False,
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",undefined)]
-        }) $
-        it "makes sure we get a 410 when resource does not exist, but did exist previously" $ do
-          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
-          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
-          request "DELETE" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
-
-    describe "415: Unsupported Media Type" $ do
-      withApp (Rest.rest "/" Rest.defaultConfig {
-          allowedMethods = return [POST]
-        }) $
-        it "makes sure we get a 415 when POSTing to server that accepts nothing" $
-          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 415}
-
-      withApp (Rest.rest "/" Rest.defaultConfig {
-          allowedMethods = return [POST],
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
-        }) $
-        it "makes sure we get a 415 when POSTing with invalid content-type" $
-          request "POST" "/" [("Content-Type","--")] "" `shouldRespondWith` "" {matchStatus = 415}
-
     describe "300: Multiple Representations" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
           contentTypesProvided = return [("text/html",text "xxx")],
@@ -443,6 +365,40 @@ spec = do
         }) $
         it "makes sure we get a 307 when a resource existed before and is moved temporarily" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 307, matchHeaders = ["Location" <:> "xxx"]}
+
+    describe "405 Method not allowed" $
+      it "makes sure we get a 405 and an Allow header when method is not allowed" $
+        property $ \m ms -> do
+          app <- scottyAppT id (Rest.rest "/" Rest.defaultConfig {allowedMethods = return ms})
+          let known = [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
+          let check = if | m `notElem` known -> (`shouldRespondWith` 501)
+                         | m `notElem` ms    -> (`shouldRespondWith` 405 {matchHeaders = ["allow" <:> (cs . intercalate ", " . map (cs . show)) ms]})
+                         | otherwise         -> \_ -> return ()
+          let waiSession = check (request ((pack . show) m) "/" [] "")
+          runWaiSession waiSession app
+
+    describe "400 Bad Request" $
+      withApp (Rest.rest "/" Rest.defaultConfig {malformedRequest = return True}) $
+        it "makes sure we get a 400 when request is considered malformed" $
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 400}
+
+    describe "401 Unauthorized" $
+      withApp (Rest.rest "/" Rest.defaultConfig {isAuthorized = return (Rest.NotAuthorized "Basic")}) $
+        it "makes sure we get a 401 when access is not authorized" $
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 401, matchHeaders = ["WWW-Authenticate" <:> "Basic"]}
+
+    describe "403 Forbidden" $
+      withApp (Rest.rest "/" Rest.defaultConfig {forbidden = return True}) $
+        it "makes sure we get a 403 when access is forbidden" $
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 403}
+
+    describe "404 Not Found" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          resourceExists = return False,
+          contentTypesProvided = return [("text/html",undefined)]
+        }) $
+        it "makes sure we get a 404 when resource does not exist and did not exist previously" $
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 404}
 
     describe "406 Not Acceptable" $ do
       withApp (Rest.rest "/" Rest.defaultConfig) $
@@ -523,6 +479,50 @@ spec = do
           request "PUT" "/" [("Content-Type","text/plain"), ("Accept","text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 409}
 
+    describe "410 Gone" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          resourceExists = return False,
+          previouslyExisted = return True,
+          allowedMethods = return [GET, POST, DELETE],
+          allowMissingPost = return False,
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",undefined)]
+        }) $
+        it "makes sure we get a 410 when resource does not exist, but did exist previously" $ do
+          request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
+          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
+          request "DELETE" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
+
+    describe "415: Unsupported Media Type" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST]
+        }) $
+        it "makes sure we get a 415 when POSTing to server that accepts nothing" $
+          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 415}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+        }) $
+        it "makes sure we get a 415 when POSTing with invalid content-type" $
+          request "POST" "/" [("Content-Type","--")] "" `shouldRespondWith` "" {matchStatus = 415}
+
+    describe "500 Internal Server Error" $
+      withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = raise $ stringError "XXX"}) $
+        it "makes sure we get a 500 when throwing a string error" $
+          request "GET" "/" [] "" `shouldRespondWith` 500
+
+    describe "501 Not Implemented" $
+      withApp (Rest.rest "/" Rest.defaultConfig) $
+        it "makes sure we get a 501 when using an unimplemented method" $
+          request "CONNECT" "/" [] "" `shouldRespondWith` 501
+
+    describe "503 Not available" $
+      withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = return False}) $
+        it "makes sure we get a 503 when serviceAvailable returns False" $
+          request "GET" "/" [] "" `shouldRespondWith` 503
+
     describe "Content negotiation" $
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "html"), ("application/json",json ("json" :: String))]
@@ -543,6 +543,7 @@ spec = do
           request "GET" "/" [("Accept","text/html;q=0.5, application/json;q=0.4")] ""
             `shouldRespondWith` "html" {matchStatus = 200}
 
+  describe "Exceptions" $
     describe "Recovering from exceptions" $
       withApp (Rest.rest "/" Rest.defaultConfig {
               contentTypesProvided = return [("text/html", raise (stringError "XXX") `rescue` (text . showError))]
