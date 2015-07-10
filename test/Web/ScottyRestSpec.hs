@@ -445,6 +445,11 @@ spec = do
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 307, matchHeaders = ["Location" <:> "xxx"]}
 
     describe "406 Not Acceptable" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig) $
+        it "makes sure we get a 406 when we don't provided any types" $
+          request "GET" "/" [("Accept","text/html")] ""
+            `shouldRespondWith` "" {matchStatus = 406}
+
       withApp (Rest.rest "/" Rest.defaultConfig {
         contentTypesProvided = return [("text/html",text "")]
       }) $
