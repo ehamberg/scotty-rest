@@ -321,6 +321,11 @@ spec = do
           let waiSession = check (request ((pack . show) m) "/" [] "")
           runWaiSession waiSession app
 
+    describe "500 Internal Server Error" $
+      withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = raise $ stringError "XXX"}) $
+        it "makes sure we get a 500 when throwing a string error" $
+          request "GET" "/" [] "" `shouldRespondWith` 500
+
     describe "501 Not Implemented" $
       withApp (Rest.rest "/" Rest.defaultConfig) $
         it "makes sure we get a 501 when using an unimplemented method" $
