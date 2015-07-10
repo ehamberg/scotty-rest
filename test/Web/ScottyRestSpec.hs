@@ -538,6 +538,14 @@ spec = do
           request "GET" "/" [("Accept","text/html;q=0.5, application/json;q=0.4")] ""
             `shouldRespondWith` "html" {matchStatus = 200}
 
+    describe "Recovering from exceptions" $
+      withApp (Rest.rest "/" Rest.defaultConfig {
+              contentTypesProvided = return [("text/html", raise (stringError "XXX") `rescue` (text . showError))]
+        }) $
+        it "makes sure we can recover from a `raise`" $
+          request "GET" "/" [] ""
+            `shouldRespondWith` "InternalServerError \"XXX\"" {matchStatus = 200}
+
   describe "Test servers" $
     describe "Echo server" $
       withApp (Rest.rest "/" Rest.defaultConfig {
