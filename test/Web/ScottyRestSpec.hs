@@ -83,6 +83,22 @@ spec = do
           request "GET" "/" [("if-none-match","\"foo\", \"bar\"")] ""
             `shouldRespondWith` 304 {matchHeaders = expectedHeaders}
 
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                contentTypesProvided = return [("text/html",text "foo")],
+                generateEtag = return (Just (Rest.Strong "foo"))
+              }) $
+        it "makes sure we get a 304 Not Changed for if-none-match *" $ do
+          let expectedHeaders = ["Etag" <:> "\"foo\""]
+          request "GET" "/" [("if-none-match","*")] ""
+            `shouldRespondWith` 304 {matchHeaders = expectedHeaders}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                allowedMethods = return [DELETE]
+              }) $
+        it "makes sure we get a 412 Precondition Failed for if-none-match * for non-GET/HEAD" $ do
+          request "DELETE" "/" [("if-none-match","*")] ""
+            `shouldRespondWith` 412
+
     describe "If-Unmodified-Since" $ do
       let time = read" 2015-01-01 12:00:00.000000 UTC"
       withApp (Rest.rest "/" Rest.defaultConfig {

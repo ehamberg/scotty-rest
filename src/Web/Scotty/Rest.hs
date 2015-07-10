@@ -475,6 +475,7 @@ allowsMissingPost config onTrue onFalse = do
      else onFalse
 
 ifEtagMatches :: (MonadIO m) => Config m -> TL.Text -> RestM m () -> RestM m () -> RestM m ()
+ifEtagMatches _      "*"   onTrue _       = onTrue
 ifEtagMatches config given onTrue onFalse = do
   tag <- generateEtag config
   case tag of
@@ -483,7 +484,6 @@ ifEtagMatches config given onTrue onFalse = do
                      then onTrue
                      else onFalse
     where eTagMatch :: ETag -> TL.Text -> Bool
-          eTagMatch _ "*" = True
           eTagMatch t g   = (any (equalTo t) . map TL.strip . TL.splitOn ",") g
           equalTo (Strong t) g = ("\"" <> t <> "\"") == g
           equalTo (Weak t)   g = ("\"" <> t <> "\"") == g
