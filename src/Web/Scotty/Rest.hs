@@ -125,7 +125,7 @@ findPreferred config headerName parse provided match = do
 requestMethod :: (MonadIO m) => RestM m StdMethod
 requestMethod = do
   req <- request
-  case (parseMethod .Wai.requestMethod) req of
+  case (parseMethod . Wai.requestMethod) req of
        Left  _       -> raise NotImplemented501
        Right method  -> if method `elem` [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
                            then return method
