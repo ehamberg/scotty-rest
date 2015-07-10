@@ -368,7 +368,13 @@ spec = do
           request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
           request "DELETE" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
 
-    describe "415: Unsupported Media Type" $
+    describe "415: Unsupported Media Type" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST]
+        }) $
+        it "makes sure we get a 415 when POSTing to server that accepts nothing" $
+          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 415}
+
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
           contentTypesProvided = return [("text/html",undefined)],
