@@ -13,7 +13,6 @@ import           Web.Scotty.Rest  (RestConfig (..), StdMethod (..))
 import qualified Web.Scotty.Rest  as Rest
 import           Web.Scotty.Trans hiding (delete, get, patch, post, put, request)
 
-import Control.Monad           (liftM)
 import Control.Monad.State     (evalStateT)
 import Data.ByteString.Char8   (pack)
 import Data.String.Conversions (cs)
@@ -572,7 +571,7 @@ spec = do
     describe "Echo server" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           contentTypesProvided = return [("text/plain", text "wtf")],
-          contentTypesAccepted = return [("text/plain", liftM (Rest.SucceededWithContent  "text/plain" . cs) body)],
+          contentTypesAccepted = return [("text/plain", fmap (Rest.SucceededWithContent  "text/plain" . cs) body)],
           allowedMethods = return [POST]
         }) $
         it "makes sure we can POST a text/plain body and get it back" $
@@ -583,7 +582,7 @@ spec = do
     describe "Server using a custom monad" $
       (with . scottyAppT (`evalStateT` Nothing)) (Rest.rest "/" Rest.defaultConfig {
           contentTypesProvided = return [("text/plain", text "wtf")],
-          contentTypesAccepted = return [("text/plain", liftM (Rest.SucceededWithContent  "text/plain" . cs) body)],
+          contentTypesAccepted = return [("text/plain", fmap (Rest.SucceededWithContent  "text/plain" . cs) body)],
           allowedMethods = return [POST]
         }) $
         it "makes sure we can POST a text/plain body and get it back" $
