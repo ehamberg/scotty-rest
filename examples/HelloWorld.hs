@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module HelloWorld where
+module Main where
 
 import Network.Wai.Middleware.RequestLogger
 import Web.Scotty.Rest

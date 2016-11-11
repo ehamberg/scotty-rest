@@ -13,10 +13,9 @@ cabal-version:       >=1.10
 description:
   Webmachine-like REST library for Scotty.
 
-extra-source-files:
-    examples/HelloWorld.hs
-    examples/Parameters.hs
-    examples/Database.hs
+flag build-examples
+  Description: Build the example servers
+  Default:     False
 
 library
   exposed-modules:  Web.Scotty.Rest
@@ -41,7 +40,54 @@ library
                , wai                >= 3.2   && < 3.3
                , wai-extra          >= 3.0   && < 3.1
   default-language:    Haskell2010
-  GHC-options: -Wall
+  GHC-options: -O2 -Wall
+
+executable database-example
+  main-is:          Database.hs
+  hs-source-dirs:   examples
+  default-language: Haskell2010
+  GHC-options: -O2 -Wall
+  if flag(build-examples)
+    Buildable: True
+  else
+    Buildable: False
+  build-depends: base
+               , scotty-rest
+               , aeson
+               , mtl
+               , sqlite-simple
+               , scotty
+               , text
+               , wai-extra
+
+executable hello-world-example
+  main-is:          HelloWorld.hs
+  hs-source-dirs:   examples
+  default-language: Haskell2010
+  GHC-options: -O2 -Wall
+  if flag(build-examples)
+    Buildable: True
+  else
+    Buildable: False
+  build-depends: base
+               , scotty-rest
+               , scotty
+               , wai-extra
+
+executable parameters-example
+  main-is:          Parameters.hs
+  hs-source-dirs:   examples
+  default-language: Haskell2010
+  GHC-options: -O2 -Wall
+  if flag(build-examples)
+    Buildable: True
+  else
+    Buildable: False
+  build-depends: base
+               , scotty-rest
+               , scotty
+               , text
+               , wai-extra
 
 test-suite spec
   main-is:          Spec.hs

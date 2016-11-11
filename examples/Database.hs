@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Database where
+module Main where
 
 import Control.Exception                    (SomeException, try)
 import Control.Monad.State

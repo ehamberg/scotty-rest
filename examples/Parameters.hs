@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parameters where
+module Main where
 
 import Data.Text.Lazy
 import Network.Wai.Middleware.RequestLogger
