@@ -5,7 +5,7 @@ module Main where
 
 import Control.Exception                    (SomeException, try)
 import Control.Monad.State
-import Data.Aeson
+import Data.Aeson                           hiding (json)
 import Data.Foldable
 import Data.Text.Lazy                       hiding (map)
 import Database.SQLite.Simple               hiding (fold)
@@ -50,7 +50,7 @@ app = scottyT 3000 (`evalStateT` Nothing) $ do
         ("application/json", do
           Just conn <- lift get
           messages <- liftIO $ query_ conn "SELECT message FROM messages LIMIT 10"
-          text $ fold $ map (\(Only m) -> pack m `snoc` '\n') messages
+          json $ map (\(Only m) -> pack m `snoc` '\n') messages
         )
       ]
     accepted = return [
