@@ -35,7 +35,7 @@ spec = do
                 allowedMethods = return [DELETE]
               }) $
         it "makes sure we get a 412 Precondition Failed when e-tag does not match" $
-          request "DELETE" "/" [("if-match","")] "" `shouldRespondWith` 412
+          request "DELETE" "/" [("if-match", "")] "" `shouldRespondWith` 412
 
     describe "If-None-Match" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
@@ -44,7 +44,7 @@ spec = do
               }) $
         it "makes sure we get a 412 Precondition Failed for DELETE when e-tag matches" $ do
           let expectedHeaders = ["Etag" <:> "\"foo\""]
-          request "DELETE" "/" [("if-none-match","\"foo\"")] ""
+          request "DELETE" "/" [("if-none-match", "\"foo\"")] ""
             `shouldRespondWith` 412 {matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
@@ -53,86 +53,86 @@ spec = do
               }) $
         it "makes sure we get a 412 Precondition Failed for DELETE when e-tag matches" $ do
           let expectedHeaders = ["Etag" <:> "\"foo\""]
-          request "DELETE" "/" [("if-none-match","\"foo\", \"bar\"")] ""
+          request "DELETE" "/" [("if-none-match", "\"foo\", \"bar\"")] ""
             `shouldRespondWith` 412 {matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",text "foo")],
+                contentTypesProvided = return [("text/html", text "foo")],
                 generateEtag = return (Just (Rest.Strong "foo"))
               }) $
         it "makes sure we don't get a 304 Not Changed for GET when e-tag doesn't match" $ do
           let expectedHeaders = ["Etag" <:> "\"foo\""]
-          request "GET" "/" [("if-none-match","\"bar\"")] ""
+          request "GET" "/" [("if-none-match", "\"bar\"")] ""
             `shouldRespondWith` 200 {matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",undefined)],
+                contentTypesProvided = return [("text/html", undefined)],
                 generateEtag = return (Just (Rest.Strong "foo"))
               }) $
         it "makes sure we get a 304 Not Changed for GET when e-tag matches" $ do
           let expectedHeaders = ["Etag" <:> "\"foo\""]
-          request "GET" "/" [("if-none-match","\"foo\"")] ""
+          request "GET" "/" [("if-none-match", "\"foo\"")] ""
             `shouldRespondWith` 304 {matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",undefined)],
+                contentTypesProvided = return [("text/html", undefined)],
                 generateEtag = return (Just (Rest.Strong "bar"))
               }) $
         it "makes sure we get a 304 Not Changed for GET when e-tag matches" $ do
           let expectedHeaders = ["Etag" <:> "\"bar\""]
-          request "GET" "/" [("if-none-match","\"foo\", \"bar\"")] ""
+          request "GET" "/" [("if-none-match", "\"foo\", \"bar\"")] ""
             `shouldRespondWith` 304 {matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",text "foo")],
+                contentTypesProvided = return [("text/html", text "foo")],
                 generateEtag = return (Just (Rest.Strong "foo"))
               }) $
         it "makes sure we get a 304 Not Changed for if-none-match *" $ do
           let expectedHeaders = ["Etag" <:> "\"foo\""]
-          request "GET" "/" [("if-none-match","*")] ""
+          request "GET" "/" [("if-none-match", "*")] ""
             `shouldRespondWith` 304 {matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
                 allowedMethods = return [DELETE]
               }) $
         it "makes sure we get a 412 Precondition Failed for if-none-match * for non-GET/HEAD" $ do
-          request "DELETE" "/" [("if-none-match","*")] ""
+          request "DELETE" "/" [("if-none-match", "*")] ""
             `shouldRespondWith` 412
 
     describe "If-Unmodified-Since" $ do
       let time = read" 2015-01-01 12:00:00.000000 UTC"
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",undefined)],
+                contentTypesProvided = return [("text/html", undefined)],
                 lastModified = return (Just time)
               }) $
         it "makes sure we get a 412 Not Changed when not modified since given date" $ do
           let expectedHeaders = ["Last-Modified" <:> "Thu, 01 Jan 2015 12:00:00 GMT"]
-          request "GET" "/" [("if-unmodified-since","Thu, 31 May 2014 20:00:00 GMT")] ""
+          request "GET" "/" [("if-unmodified-since", "Thu, 31 May 2014 20:00:00 GMT")] ""
             `shouldRespondWith` 412 {matchHeaders = expectedHeaders}
 
     describe "If-Modified-Since" $ do
       let time = read" 2015-01-01 12:00:00.000000 UTC"
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",undefined)],
+                contentTypesProvided = return [("text/html", undefined)],
                 lastModified = return (Just time)
               }) $
         it "makes sure we get a 304 Not Changed when not modified since given date" $ do
           let expectedHeaders = ["Last-Modified" <:> "Thu, 01 Jan 2015 12:00:00 GMT"]
-          request "GET" "/" [("if-modified-since","Thu, 31 May 2015 20:00:00 GMT")] ""
+          request "GET" "/" [("if-modified-since", "Thu, 31 May 2015 20:00:00 GMT")] ""
             `shouldRespondWith` 304 {matchHeaders = expectedHeaders}
 
 
   describe "ETag/Expires/Last-Modified headers" $ do
     describe "ETag" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",text "hello")]
+                contentTypesProvided = return [("text/html", text "hello")]
               , generateEtag = return (Just (Rest.Strong "foo"))
               }) $
         it "makes sure we get an ETag header" $
           request "GET" "/" [] "" `shouldRespondWith` "hello" {matchHeaders = ["ETag" <:> "\"foo\""]}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",text "hello")]
+                contentTypesProvided = return [("text/html", text "hello")]
               , generateEtag = return (Just (Rest.Weak "foo"))
               }) $
         it "makes sure we get a (weak) ETag header" $
@@ -141,7 +141,7 @@ spec = do
     describe "Expires" $ do
       let now = read "2015-02-16 13:11:11.753542 UTC"
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",text "hello")]
+                contentTypesProvided = return [("text/html", text "hello")]
               , expires = return (Just now)
               }) $
         it "makes sure we get an Expires header" $ do
@@ -151,7 +151,7 @@ spec = do
     describe "Last-Modified" $ do
       let time = read" 2015-01-01 12:00:00.000000 UTC"
       withApp (Rest.rest "/" Rest.defaultConfig {
-                contentTypesProvided = return [("text/html",text "hello")]
+                contentTypesProvided = return [("text/html", text "hello")]
               , lastModified = return (Just time)
               }) $
         it "makes sure we get a Last-Modified header" $ do
@@ -171,7 +171,7 @@ spec = do
           request "OPTIONS" "/" [] "" `shouldRespondWith` "" {matchHeaders = expectedHeaders}
 
     describe "Custom OPTIONS handler" $
-      withApp (Rest.rest "/" Rest.defaultConfig {optionsHandler = return (Just ("text/plain",text "xyz"))}) $
+      withApp (Rest.rest "/" Rest.defaultConfig {optionsHandler = return (Just ("text/plain", text "xyz"))}) $
         it "makes sure a custom OPTIONS handler is run" $
           request "OPTIONS" "/" [] ""
             `shouldRespondWith` "xyz" {matchHeaders = ["Content-Type" <:> "text/plain"]}
@@ -202,72 +202,72 @@ spec = do
     describe "200: Created with content" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
-          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesProvided = return [("text/html", undefined)],
           contentTypesAccepted = return [
             ("text/plain", return (Rest.SucceededWithContent "text/html" "hi"))
           ]
         }) $
         it "makes sure we get a 200 when handler returns SucceededWithContent" $ do
           let expectedHeaders = ["Content-Type" <:> "text/html"]
-          request "POST" "/" [("Content-Type","text/plain")] ""
+          request "POST" "/" [("Content-Type", "text/plain")] ""
             `shouldRespondWith` "hi" {matchStatus = 200, matchHeaders = expectedHeaders}
 
     describe "201: Created" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
           resourceExists = return False,
-          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesProvided = return [("text/html", undefined)],
           contentTypesAccepted = return [
-            ("text/plain",return (Rest.SucceededWithLocation "foo.bar"))
+            ("text/plain", return (Rest.SucceededWithLocation "foo.bar"))
           ]
         }) $
         it "makes sure we get a 201 when handler returns SucceededWithLocation" $ do
           let expectedHeaders = ["Location" <:> "foo.bar"]
-          request "POST" "/" [("Content-Type","text/plain")] ""
+          request "POST" "/" [("Content-Type", "text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 201, matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
           resourceExists = return False,
-          contentTypesProvided = return [("text/html",undefined)],
+          contentTypesProvided = return [("text/html", undefined)],
           contentTypesAccepted = return [
-            ("text/plain",return (Rest.SucceededWithContent "text/plain" "foo"))
+            ("text/plain", return (Rest.SucceededWithContent "text/plain" "foo"))
           ]
         }) $
         it "makes sure we get a 201 when handler returns SucceededWithLocation" $ do
           let expectedHeaders = ["Content-Type" <:> "text/plain"]
-          request "POST" "/" [("Content-Type","text/plain")] ""
+          request "POST" "/" [("Content-Type", "text/plain")] ""
             `shouldRespondWith` "foo" {matchStatus = 201, matchHeaders = expectedHeaders}
 
     describe "204: No Content" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("text/plain",return Rest.Succeeded)]
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("text/plain", return Rest.Succeeded)]
         }) $
         it "makes sure we get a 204 when handler returns Succeeded" $
-          request "POST" "/" [("Content-Type","text/plain")] ""
+          request "POST" "/" [("Content-Type", "text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 204}
 
     describe "204: No Content" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [PUT],
           resourceExists = return True,
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("text/plain",return Rest.Succeeded)]
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("text/plain", return Rest.Succeeded)]
         }) $
         it "makes sure we get a 204 when handler returns Succeeded" $
-          request "PUT" "/" [("Content-Type","text/plain")] ""
+          request "PUT" "/" [("Content-Type", "text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 204}
 
     describe "204: POSTing to missing resource that existed previously" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("application/json", return Rest.Succeeded)]
         }) $
         it "makes sure we get a 204 when POSTing to resource that existed, when allowing POSTing to missing resource" $
-          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 204}
+          request "POST" "/" [("Content-Type", "application/json")] "" `shouldRespondWith` "" {matchStatus = 204}
 
     describe "404: POSTint to never-existed" $
       withApp (Rest.rest "/" Rest.defaultConfig {
@@ -275,11 +275,11 @@ spec = do
           resourceExists = return False,
           previouslyExisted = return False,
           allowMissingPost = return False,
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("application/json", return Rest.Succeeded)]
         }) $
         it "makes sure we get a 404 when POSTing to a never-existed resource when not allowing missing POSTs" $
-          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 404}
+          request "POST" "/" [("Content-Type", "application/json")] "" `shouldRespondWith` "" {matchStatus = 404}
 
   describe "HTTP (PATCH)" $
     describe "404: PATCHing a never-existed" $
@@ -287,16 +287,16 @@ spec = do
           allowedMethods = return [PATCH],
           resourceExists = return False,
           previouslyExisted = return False,
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("application/json", return Rest.Succeeded)]
         }) $
         it "makes sure we get a 404 when PATCHing a never-existed resource" $
-          request "PATCH" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 404}
+          request "PATCH" "/" [("Content-Type", "application/json")] "" `shouldRespondWith` "" {matchStatus = 404}
 
   describe "HTTP (Vary)" $ do
     describe "Multiple content types provided" $
       withApp (Rest.rest "/" Rest.defaultConfig {
-          contentTypesProvided = return [("text/plain",text "foo"),("text/html",undefined)]
+          contentTypesProvided = return [("text/plain", text "foo"), ("text/html", undefined)]
         }) $
         it "makes sure we get a Vary header with `Accept` when offering several content types" $ do
           let expectedHeaders = ["Vary" <:> "Accept"]
@@ -304,7 +304,7 @@ spec = do
 
     describe "Multiple languages provided" $
       withApp (Rest.rest "/" Rest.defaultConfig {
-          contentTypesProvided = return [("text/plain",text "foo")],
+          contentTypesProvided = return [("text/plain", text "foo")],
           languagesProvided = return (Just ["en-gb", "de"])
         }) $
         it "makes sure we get a Vary header with `Accept` when offering several languages" $ do
@@ -313,7 +313,7 @@ spec = do
 
     describe "Multiple charsets provided" $
       withApp (Rest.rest "/" Rest.defaultConfig {
-          contentTypesProvided = return [("text/plain",text "foo")],
+          contentTypesProvided = return [("text/plain", text "foo")],
           charsetsProvided = return (Just ["ascii", "utf-8"])
         }) $
         it "makes sure we get a Vary header with `Accept` when offering several languages" $ do
@@ -323,7 +323,7 @@ spec = do
   describe "HTTP (General)" $ do
     describe "300: Multiple Representations" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
-          contentTypesProvided = return [("text/html",text "xxx")],
+          contentTypesProvided = return [("text/html", text "xxx")],
           multipleChoices = return (Rest.MultipleRepresentations "text/plain" "foo")
         }) $
         it "makes sure we get a 300 with a body when there are multiple representations" $ do
@@ -332,7 +332,7 @@ spec = do
             `shouldRespondWith` "foo" {matchStatus = 300, matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-          contentTypesProvided = return [("text/html",text "xxx")],
+          contentTypesProvided = return [("text/html", text "xxx")],
           multipleChoices = return (Rest.MultipleRepresentations "text/plain" "foo")
         }) $
         it "makes sure we get a 300 without a body for HEAD when there are multiple representations" $ do
@@ -342,24 +342,24 @@ spec = do
 
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [PUT],
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",return (Rest.SucceededWithContent "text/plain" "xxx"))],
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("application/json", return (Rest.SucceededWithContent "text/plain" "xxx"))],
           multipleChoices = return (Rest.MultipleRepresentations "text/plain" "foo")
         }) $
         it "makes sure we get a 300 with a body when there are multiple representations" $ do
           let expectedHeaders = ["Content-Type" <:> "text/plain"]
-          request "PUT" "/" [("Content-Type","application/json")] ""
+          request "PUT" "/" [("Content-Type", "application/json")] ""
             `shouldRespondWith` "foo" {matchStatus = 300, matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",return (Rest.SucceededWithContent "text/plain" "xxx"))],
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("application/json", return (Rest.SucceededWithContent "text/plain" "xxx"))],
           multipleChoices = return (Rest.MultipleWithPreferred "text/plain" "foo" "foo.bar")
         }) $
         it "makes sure we get a 300 with a location body when there are multiple representations, where one is preferred" $ do
           let expectedHeaders = ["Location" <:> "foo.bar", "Content-Type" <:> "text/plain"]
-          request "POST" "/" [("Content-Type","application/json")] ""
+          request "POST" "/" [("Content-Type", "application/json")] ""
             `shouldRespondWith` "foo" {matchStatus = 300, matchHeaders = expectedHeaders}
 
     describe "301 Moved Permanently" $
@@ -367,7 +367,7 @@ spec = do
           resourceExists = return False,
           previouslyExisted = return True,
           resourceMoved = return (Rest.MovedPermanently "xxx"),
-          contentTypesProvided = return [("text/html",undefined)]
+          contentTypesProvided = return [("text/html", undefined)]
         }) $
         it "makes sure we get a 301 when a resource existed before and is moved permanently" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 301, matchHeaders = ["Location" <:> "xxx"]}
@@ -377,7 +377,7 @@ spec = do
           resourceExists = return False,
           previouslyExisted = return True,
           resourceMoved = return (Rest.MovedTemporarily "xxx"),
-          contentTypesProvided = return [("text/html",undefined)]
+          contentTypesProvided = return [("text/html", undefined)]
         }) $
         it "makes sure we get a 307 when a resource existed before and is moved temporarily" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 307, matchHeaders = ["Location" <:> "xxx"]}
@@ -411,7 +411,7 @@ spec = do
     describe "404 Not Found" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
-          contentTypesProvided = return [("text/html",undefined)]
+          contentTypesProvided = return [("text/html", undefined)]
         }) $
         it "makes sure we get a 404 when resource does not exist and did not exist previously" $
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 404}
@@ -419,80 +419,80 @@ spec = do
     describe "406 Not Acceptable" $ do
       withApp (Rest.rest "/" Rest.defaultConfig) $
         it "makes sure we get a 406 when we don't provided any types" $
-          request "GET" "/" [("Accept","text/html")] ""
+          request "GET" "/" [("Accept", "text/html")] ""
             `shouldRespondWith` "" {matchStatus = 406}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-        contentTypesProvided = return [("text/html",text "")]
+        contentTypesProvided = return [("text/html", text "")]
       }) $
         it "makes sure we get a 406 when we don't provided the requested type" $ do
-          request "GET" "/" [("Accept","text/html; charset=utf-8")] ""
+          request "GET" "/" [("Accept", "text/html; charset=utf-8")] ""
             `shouldRespondWith` "" {matchStatus = 406}
-          request "GET" "/" [("Accept","text/plain")] ""
+          request "GET" "/" [("Accept", "text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 406}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-        contentTypesProvided = return [("text/html; charset=utf-8",text "")]
+        contentTypesProvided = return [("text/html; charset=utf-8", text "")]
       }) $
         it "makes sure we get a 406 when we don't provided the requested type" $ do
-          request "GET" "/" [("Accept","*/*")] ""
+          request "GET" "/" [("Accept", "*/*")] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept","text/html; charset=utf-8")] ""
+          request "GET" "/" [("Accept", "text/html; charset=utf-8")] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept","text/html; charset=latin1")] ""
+          request "GET" "/" [("Accept", "text/html; charset=latin1")] ""
             `shouldRespondWith` "" {matchStatus = 406}
-          request "GET" "/" [("Accept","text/*; charset=utf-8")] ""
+          request "GET" "/" [("Accept", "text/*; charset=utf-8")] ""
             `shouldRespondWith` "" {matchStatus = 200}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-        contentTypesProvided = return [("text/html",text "")],
+        contentTypesProvided = return [("text/html", text "")],
         languagesProvided = return (Just ["en-gb", "de"])
       }) $
         it "makes sure we get a 406 when we don't provided the requested language" $ do
           request "GET" "/" [] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept-Language","en-gb")] ""
+          request "GET" "/" [("Accept-Language", "en-gb")] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept-Language","en-GB")] ""
+          request "GET" "/" [("Accept-Language", "en-GB")] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept-Language","en")] ""
+          request "GET" "/" [("Accept-Language", "en")] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept-Language","en-US")] ""
+          request "GET" "/" [("Accept-Language", "en-US")] ""
             `shouldRespondWith` "" {matchStatus = 406}
-          request "GET" "/" [("Accept-Language","de")] ""
+          request "GET" "/" [("Accept-Language", "de")] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept-Language","de-DE")] ""
+          request "GET" "/" [("Accept-Language", "de-DE")] ""
             `shouldRespondWith` "" {matchStatus = 406}
-          request "GET" "/" [("Accept-Language","no")] ""
+          request "GET" "/" [("Accept-Language", "no")] ""
             `shouldRespondWith` "" {matchStatus = 406}
-          request "GET" "/" [("Accept-Language","no-NB")] ""
+          request "GET" "/" [("Accept-Language", "no-NB")] ""
             `shouldRespondWith` "" {matchStatus = 406}
-          request "GET" "/" [("Accept-Language","*")] ""
+          request "GET" "/" [("Accept-Language", "*")] ""
             `shouldRespondWith` "" {matchStatus = 200}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
-        contentTypesProvided = return [("text/html",text "")],
+        contentTypesProvided = return [("text/html", text "")],
         charsetsProvided = return (Just ["utf-8"])
       }) $
         it "makes sure we get a 406 when we don't provided the requested charset" $ do
           request "GET" "/" [] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept-Charset","UTF-8")] ""
+          request "GET" "/" [("Accept-Charset", "UTF-8")] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept-Charset","utf-8")] ""
+          request "GET" "/" [("Accept-Charset", "utf-8")] ""
             `shouldRespondWith` "" {matchStatus = 200}
-          request "GET" "/" [("Accept-Charset","ISO-8859-15")] ""
+          request "GET" "/" [("Accept-Charset", "ISO-8859-15")] ""
             `shouldRespondWith` "" {matchStatus = 406}
 
     describe "409 Conflict" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [PUT],
           isConflict = return True,
-          contentTypesProvided = return [("text/plain",undefined)],
-          contentTypesAccepted = return [("text/plain",undefined)]
+          contentTypesProvided = return [("text/plain", undefined)],
+          contentTypesAccepted = return [("text/plain", undefined)]
         }) $
         it "makes sure we get a 409 when there is a conflict" $
-          request "PUT" "/" [("Content-Type","text/plain"), ("Accept","text/plain")] ""
+          request "PUT" "/" [("Content-Type", "text/plain"), ("Accept", "text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 409}
 
     describe "410 Gone" $
@@ -501,12 +501,12 @@ spec = do
           previouslyExisted = return True,
           allowedMethods = return [GET, POST, DELETE],
           allowMissingPost = return False,
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",undefined)]
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("application/json", undefined)]
         }) $
         it "makes sure we get a 410 when resource does not exist, but did exist previously" $ do
           request "GET" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
-          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
+          request "POST" "/" [("Content-Type", "application/json")] "" `shouldRespondWith` "" {matchStatus = 410}
           request "DELETE" "/" [] "" `shouldRespondWith` "" {matchStatus = 410}
 
     describe "415: Unsupported Media Type" $ do
@@ -514,15 +514,15 @@ spec = do
           allowedMethods = return [POST]
         }) $
         it "makes sure we get a 415 when POSTing to server that accepts nothing" $
-          request "POST" "/" [("Content-Type","application/json")] "" `shouldRespondWith` "" {matchStatus = 415}
+          request "POST" "/" [("Content-Type", "application/json")] "" `shouldRespondWith` "" {matchStatus = 415}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
-          contentTypesProvided = return [("text/html",undefined)],
-          contentTypesAccepted = return [("application/json",return Rest.Succeeded)]
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("application/json", return Rest.Succeeded)]
         }) $
         it "makes sure we get a 415 when POSTing with invalid content-type" $
-          request "POST" "/" [("Content-Type","--")] "" `shouldRespondWith` "" {matchStatus = 415}
+          request "POST" "/" [("Content-Type", "--")] "" `shouldRespondWith` "" {matchStatus = 415}
 
     describe "500 Internal Server Error" $
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = raise $ stringError "XXX"}) $
@@ -541,22 +541,22 @@ spec = do
 
     describe "Content negotiation" $
       withApp (Rest.rest "/" Rest.defaultConfig {
-        contentTypesProvided = return [("text/html",text "html"), ("application/json",json ("json" :: String))]
+        contentTypesProvided = return [("text/html", text "html"), ("application/json", json ("json" :: String))]
       }) $
         it "makes sure we get the appropriate content" $ do
           request "GET" "/" [] ""
             `shouldRespondWith` "html" {matchStatus = 200}
-          request "GET" "/" [("Accept","*/*")] ""
+          request "GET" "/" [("Accept", "*/*")] ""
             `shouldRespondWith` "html" {matchStatus = 200}
-          request "GET" "/" [("Accept","application/*")] ""
+          request "GET" "/" [("Accept", "application/*")] ""
             `shouldRespondWith` "\"json\"" {matchStatus = 200}
-          request "GET" "/" [("Accept","application/json")] ""
+          request "GET" "/" [("Accept", "application/json")] ""
             `shouldRespondWith` "\"json\"" {matchStatus = 200}
-          request "GET" "/" [("Accept","text/plain")] ""
+          request "GET" "/" [("Accept", "text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 406}
-          request "GET" "/" [("Accept","text/html;q=0.5, application/json")] ""
+          request "GET" "/" [("Accept", "text/html;q=0.5, application/json")] ""
             `shouldRespondWith` "\"json\"" {matchStatus = 200}
-          request "GET" "/" [("Accept","text/html;q=0.5, application/json;q=0.4")] ""
+          request "GET" "/" [("Accept", "text/html;q=0.5, application/json;q=0.4")] ""
             `shouldRespondWith` "html" {matchStatus = 200}
 
   describe "Exceptions" $
@@ -571,21 +571,21 @@ spec = do
   describe "Test servers" $
     describe "Echo server" $
       withApp (Rest.rest "/" Rest.defaultConfig {
-          contentTypesProvided = return [("text/plain",text "wtf")],
-          contentTypesAccepted = return [("text/plain",liftM (Rest.SucceededWithContent  "text/plain" . cs) body)],
+          contentTypesProvided = return [("text/plain", text "wtf")],
+          contentTypesAccepted = return [("text/plain", liftM (Rest.SucceededWithContent  "text/plain" . cs) body)],
           allowedMethods = return [POST]
         }) $
         it "makes sure we can POST a text/plain body and get it back" $
-          request "POST" "/" [("Content-Type","text/plain"), ("Accept","text/plain")] "hello"
+          request "POST" "/" [("Content-Type", "text/plain"), ("Accept", "text/plain")] "hello"
             `shouldRespondWith` "hello" {matchStatus = 200, matchHeaders = ["Content-Type" <:> "text/plain"]}
 
   describe "Custom monad" $
     describe "Server using a custom monad" $
       (with . scottyAppT (`evalStateT` Nothing)) (Rest.rest "/" Rest.defaultConfig {
-          contentTypesProvided = return [("text/plain",text "wtf")],
-          contentTypesAccepted = return [("text/plain",liftM (Rest.SucceededWithContent  "text/plain" . cs) body)],
+          contentTypesProvided = return [("text/plain", text "wtf")],
+          contentTypesAccepted = return [("text/plain", liftM (Rest.SucceededWithContent  "text/plain" . cs) body)],
           allowedMethods = return [POST]
         }) $
         it "makes sure we can POST a text/plain body and get it back" $
-          request "POST" "/" [("Content-Type","text/plain"), ("Accept","text/plain")] "hello"
+          request "POST" "/" [("Content-Type", "text/plain"), ("Accept", "text/plain")] "hello"
             `shouldRespondWith` "hello" {matchStatus = 200, matchHeaders = ["Content-Type" <:> "text/plain"]}

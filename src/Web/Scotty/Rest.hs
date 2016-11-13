@@ -55,7 +55,7 @@ type Config m = RestConfig (RestM m)
 -- > main = scotty 3000 $ do
 -- >   get  "/foo" (text "Hello!")
 -- >   rest "/bar" defaultConfig {
--- >       contentTypesProvided = return [("text/html",html "Hello, World!")]
+-- >       contentTypesProvided = return [("text/html", html "Hello, World!")]
 -- >     }
 rest :: (MonadIO m) => RoutePattern -> Config m -> ScottyT RestException m ()
 rest pattern config = matchAny pattern (restHandlerStart config `rescue` handleExcept)
@@ -64,7 +64,7 @@ rest pattern config = matchAny pattern (restHandlerStart config `rescue` handleE
 -- record syntax:
 --
 -- > defaultConfig {
--- >   contentTypesProvided = return [("text/html",html "Hello, World!")]
+-- >   contentTypesProvided = return [("text/html", html "Hello, World!")]
 -- > }
 defaultConfig :: (MonadIO m) => Config m
 defaultConfig = def
@@ -107,10 +107,10 @@ findPreferred config headerName parse provided match = do
   headerAndConfig <- runMaybeT $ do
       accept  <- MaybeT (header headerName)
       provide <- MaybeT (provided config)
-      return (accept,provide)
+      return (accept, provide)
   case headerAndConfig of
        Nothing    -> return Nothing
-       Just (a,p) -> do
+       Just (a, p) -> do
          -- We now have a new failure mode: Since there is a header, and a list
          -- of languages/charsets, failing to parse the header, or failing to
          -- find a match, will now lead to a 406 Not Acceptable:
@@ -179,8 +179,8 @@ setAllowHeader config= do
 
 handleOptions :: (MonadIO m) => Config m -> RestM m ()
 handleOptions config = optionsHandler config >>= \case
-  Nothing                      -> setAllowHeader config
-  (Just (contentType,handler)) -> handler >> setContentTypeHeader contentType
+  Nothing                       -> setAllowHeader config
+  (Just (contentType, handler)) -> handler >> setContentTypeHeader contentType
 
 ----------------------------------------------------------------------------------------------------
 -- Content negotiation
@@ -252,7 +252,7 @@ handleGetHeadExisting config = do
   cond config
   addCacheHeaders config
   method <- requestMethod
-  (contentType,handler) <- preferred config
+  (contentType, handler) <- preferred config
   multipleChoices config >>= \case
     MultipleRepresentations t' c' -> writeContent t' c' >> status multipleChoices300
     MultipleWithPreferred t' c' u -> writeContent t' c' >> setHeader "location" u >>  status multipleChoices300

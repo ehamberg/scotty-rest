@@ -11,5 +11,5 @@ main :: IO ()
 main = scottyT 3000 id $ do
   middleware logStdoutDev
   rest "/:name" defaultConfig {
-    contentTypesProvided = return [("text/html",param "name" >>= html . append "Hello, ")]
+    contentTypesProvided = return [("text/html", param "name" >>= html . append "Hello, ")]
   }
