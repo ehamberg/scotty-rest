@@ -103,7 +103,7 @@ data RestConfig m = RestConfig
   --
   -- Default: 'False'
   , isConflict           :: m Bool
-  -- ^ Only for `PUT` requests. Does this request result in a conflict?
+  -- ^ For `PUT`/`PATCH` requests: Does this request result in a conflict?
   --
   -- Default: 'False'
   , contentTypesAccepted :: m [(MediaType, m ProcessingResult)]

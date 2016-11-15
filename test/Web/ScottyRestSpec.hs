@@ -485,13 +485,15 @@ spec = do
 
     describe "409 Conflict" $
       withApp (Rest.rest "/" Rest.defaultConfig {
-          allowedMethods = return [PUT],
+          allowedMethods = return [PUT, PATCH],
           isConflict = return True,
           contentTypesProvided = return [("text/plain", undefined)],
           contentTypesAccepted = return [("text/plain", undefined)]
         }) $
-        it "makes sure we get a 409 when there is a conflict" $
+        it "makes sure we get a 409 when there is a conflict" $ do
           request "PUT" "/" [("Content-Type", "text/plain"), ("Accept", "text/plain")] ""
+            `shouldRespondWith` "" {matchStatus = 409}
+          request "PATCH" "/" [("Content-Type", "text/plain"), ("Accept", "text/plain")] ""
             `shouldRespondWith` "" {matchStatus = 409}
 
     describe "410 Gone" $

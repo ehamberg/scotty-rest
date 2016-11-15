@@ -304,7 +304,7 @@ pppmethodIsPost config =
 pppmethodIsPut :: (MonadIO m) => Config m -> RestM m ()
 pppmethodIsPut config = do
   method <- requestMethod
-  when (method == PUT) $ do
+  when (method == PUT || method == PATCH) $ do
     conflict <- isConflict config
     when conflict (raise Conflict409)
 
