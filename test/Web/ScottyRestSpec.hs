@@ -293,12 +293,20 @@ spec = do
           request "PATCH" "/" [("Content-Type", "application/json")] "" `shouldRespondWith` "" {matchStatus = 404}
 
   describe "HTTP (Vary)" $ do
-    describe "Multiple content types provided" $
+    describe "Multiple content types provided" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
           contentTypesProvided = return [("text/plain", text "foo"), ("text/html", undefined)]
         }) $
         it "makes sure we get a Vary header with `Accept` when offering several content types" $ do
           let expectedHeaders = ["Vary" <:> "Accept"]
+          request "GET" "/" [] "" `shouldRespondWith` "foo" {matchStatus = 200, matchHeaders = expectedHeaders}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          contentTypesProvided = return [("text/plain", text "foo"), ("text/html", undefined)]
+        , languagesProvided = return (Just ["en", "fr"])
+        }) $
+        it "makes sure the Vary header also includes `Accept-Langauge` when offering several languages" $ do
+          let expectedHeaders = ["Vary" <:> "Accept-Language, Accept"]
           request "GET" "/" [] "" `shouldRespondWith` "foo" {matchStatus = 200, matchHeaders = expectedHeaders}
 
     describe "Multiple languages provided" $
