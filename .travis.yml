@@ -1,4 +1,4 @@
-language: haskell
+language: c
 sudo: false
 
 cache:
@@ -10,8 +10,8 @@ before_install:
   - export PATH=~/.local/bin:$PATH
   - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
   - chmod a+x ~/.local/bin/stack
+  - stack --no-terminal setup
 
 install:
-  - stack setup
-  - stack build
-  - stack test
+  - stack --no-terminal build
+  - stack --no-terminal test
