@@ -227,7 +227,7 @@ data RestException = MovedPermanently301
                    | ServiceUnavailable503
                    | MethodNotAllowed405
                    | InternalServerError TL.Text
-                   deriving (Show, Eq)
+                   deriving (Show)
 
 instance ScottyError RestException where
   stringError = InternalServerError . TL.pack
