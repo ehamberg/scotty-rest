@@ -166,10 +166,7 @@ Flow Chart
              diagram, depending on the method.
 
 
-
-
-
-
+## `GET`/`HEAD` requests
 
                    Continuing from
                 Content Negotiation…
@@ -240,8 +237,7 @@ Flow Chart
     └───────────────────────────────────────────────────────────────────────────────────────────────┘
 
 
-
-
+## `PUT`/`POST`/`PATCH` requests
 
 
                      Continuing from
@@ -405,9 +401,7 @@ Flow Chart
     └───────────────────────────────────────────────────────────────────────────────────────────────┘
 
 
-
-
-
+## `DELETE` requests
 
                    Continuing from
                 Content Negotiation…
@@ -484,11 +478,7 @@ Flow Chart
     └───────────────────────────────────────────────────────────────────────────────────────────────┘
 
 
-
-
-
-
-
+## Conditional requests
 
     ┌───────────────────────────────────────────────────────────────────────────────────────────────┐
     │                                                                           Conditional requests│
