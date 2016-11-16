@@ -31,6 +31,7 @@ import BasePrelude hiding (Handler)
 
 import Web.Scotty.Rest.Types
 
+import           Control.Monad             (void)
 import           Control.Monad.IO.Class    (MonadIO)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Data.Convertible          (convert)
@@ -75,7 +76,7 @@ preferred config = do
   -- find and store the best handler together with the content type.  If we
   -- cannot provide that type, stop processing here and return a
   -- NotAcceptable406:
-  accept <- return . convertString . fromMaybe "*/*" =<< header "accept"
+  accept <- (convertString . fromMaybe "*/*") <$> header "accept"
   provided <- contentTypesProvided config
   contentType <- maybe (raise NotAcceptable406) return (matchAccept (map fst provided) accept)
   bestHandler <- maybe (raise NotAcceptable406) return (mapAccept provided accept)
@@ -193,7 +194,7 @@ contentNegotiationAccept :: (MonadIO m) => Config m -> RestM m ()
 contentNegotiationAccept config = do
   accept <- header "accept"
   -- evalute `preferred` to force early 406 (Not acceptable):
-  when (isJust accept) (preferred config >> return ())
+  when (isJust accept) $ void (preferred config)
   contentNegotiationAcceptLanguage config
 
 -- If there is an `Accept-Language` header, check that we provide that
@@ -202,7 +203,7 @@ contentNegotiationAcceptLanguage :: (MonadIO m) => Config m -> RestM m ()
 contentNegotiationAcceptLanguage config = do
   acceptLanguage <- header "accept-language"
   -- evalute `language` to force early 406 (Not acceptable):
-  when (isJust acceptLanguage) (language config >> return ())
+  when (isJust acceptLanguage) $ void (language config)
   contentNegotiationAcceptCharSet config
 
 -- -- If there is an `Accept-Charset` header, check that we provide that
@@ -211,7 +212,7 @@ contentNegotiationAcceptCharSet :: (MonadIO m) => Config m -> RestM m ()
 contentNegotiationAcceptCharSet config = do
   acceptCharset <- header "accept-charset"
   -- evalute `charset` to force early 406 (Not acceptable):
-  when (isJust acceptCharset) (charset config >> return ())
+  when (isJust acceptCharset) $ void (charset config)
   contentNegotiationVariances config
 
 -- If we provide more than one content type, add `Accept` to `Vary` header. If
@@ -276,7 +277,8 @@ checkMoved config = resourceMoved config >>= \case
 handlePutPostPatchNonExisting :: (MonadIO m) => Config m -> RestM m ()
 handlePutPostPatchNonExisting config = do
   -- If there is an if-match header, the precondition failed since the resource doesn't exist
-  liftM isJust (header "if-match") >>= (`when` raise PreconditionFailed412)
+  hasIfMatchHeader <- isJust <$> header "if-match"
+  when hasIfMatchHeader (raise PreconditionFailed412)
   ifMethodIs [POST, PATCH]
     (ppppreviouslyExisted config)
     (pppmethodIsPut config)
@@ -448,7 +450,8 @@ modifiedSinceHeaderDate config hdr = runMaybeT $ do
 handleNonExisting :: (MonadIO m) => Config m -> RestM m ()
 handleNonExisting config = do
   -- If there is an if-match header, the precondition failed since the resource doesn't exist
-  liftM isJust (header "if-match") >>= (`when` raise PreconditionFailed412)
+  hasIfMatchHeader <- isJust <$> header "if-match"
+  when hasIfMatchHeader (raise PreconditionFailed412)
 
   -- Did this resource exist before?
   existed <- previouslyExisted config
