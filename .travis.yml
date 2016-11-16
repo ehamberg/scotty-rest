@@ -17,3 +17,7 @@ before_install:
 
 script:
   - stack --no-terminal --install-ghc test
+
+after_script:
+  - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.4.0/shc-linux-x64-8.0.1.tar.bz2 | tar -xj
+  - ./shc scotty-rest spec
