@@ -156,7 +156,8 @@ restHandlerStart config = do
   -- Is the client authorized?
   isAuthorized config >>= \case
        Authorized                -> return ()
-       (NotAuthorized challenge) -> setHeader "WWW-Authenticate" challenge >> raise Unauthorized401
+       (NotAuthorized challenge) -> do setHeader "WWW-Authenticate" challenge
+                                       raise Unauthorized401
 
   -- Is the client forbidden to access this resource?
   isForbidden <- forbidden config
@@ -255,8 +256,11 @@ handleGetHeadExisting config = do
   method <- requestMethod
   (contentType, handler) <- preferred config
   multipleChoices config >>= \case
-    MultipleRepresentations t' c' -> writeContent t' c' >> status multipleChoices300
-    MultipleWithPreferred t' c' u -> writeContent t' c' >> setHeader "location" u >>  status multipleChoices300
+    MultipleRepresentations t' c' -> do writeContent t' c'
+                                        status multipleChoices300
+    MultipleWithPreferred t' c' u -> do writeContent t' c'
+                                        setHeader "location" u
+                                        status multipleChoices300
     UniqueRepresentation          -> do when (method == GET) handler
                                         setContentTypeHeader contentType
                                         status ok200
@@ -352,9 +356,14 @@ writeContent t c = do
 
 resourceWithContent :: (MonadIO m) => Config m -> MediaType -> TL.Text -> RestM m ()
 resourceWithContent config t c = multipleChoices config >>= \case
-  UniqueRepresentation          -> setContentTypeHeader t >> (raw . convertString) c >> status ok200
-  MultipleRepresentations t' c' -> writeContent t' c' >> status multipleChoices300
-  MultipleWithPreferred t' c' u -> writeContent t' c' >> setHeader "location" u >>  status multipleChoices300
+  UniqueRepresentation          -> do setContentTypeHeader t
+                                      (raw . convertString) c
+                                      status ok200
+  MultipleRepresentations t' c' -> do writeContent t' c'
+                                      status multipleChoices300
+  MultipleWithPreferred t' c' u -> do writeContent t' c'
+                                      setHeader "location" u
+                                      status multipleChoices300
 
 ----------------------------------------------------------------------------------------------------
 -- DELETE
