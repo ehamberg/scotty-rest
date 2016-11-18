@@ -369,6 +369,15 @@ spec = do
           request "POST" "/" [("Content-Type", "application/json")] ""
             `shouldRespondWith` "foo" {matchStatus = 300, matchHeaders = expectedHeaders}
 
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [GET],
+          contentTypesProvided = return [("text/html", undefined)],
+          multipleChoices = return (Rest.MultipleWithPreferred "text/plain" "foo" "foo.bar")
+        }) $
+        it "makes sure we get a 300 with a location body when there are multiple representations, where one is preferred" $ do
+          let expectedHeaders = ["Location" <:> "foo.bar", "Content-Type" <:> "text/plain"]
+          request "GET" "/" [] "" `shouldRespondWith` "foo" {matchStatus = 300, matchHeaders = expectedHeaders}
+
     describe "301 Moved Permanently" $
       withApp (Rest.rest "/" Rest.defaultConfig {
           resourceExists = return False,
