@@ -72,8 +72,8 @@ defaultConfig = def
 
 preferred :: (MonadIO m) => Config m -> RestM m (MediaType, RestM m ())
 preferred config = do
-  -- If there is an `Accept` header -- look at the content types we provide and
-  -- find and store the best handler together with the content type.  If we
+  -- If there is an `Accept` header – look at the content types we provide and
+  -- find and store the best handler together with the content type. If we
   -- cannot provide that type, stop processing here and return a
   -- NotAcceptable406:
   accept <- (convertString . fromMaybe "*/*") <$> header "accept"
