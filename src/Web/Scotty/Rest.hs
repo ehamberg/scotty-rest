@@ -228,7 +228,7 @@ contentNegotiationVariances config = do
   let varyHeader'   = if length ctp > 1 then "Accept":varyHeader           else varyHeader
   let varyHeader''  = if isJust lp      then "Accept-Language":varyHeader' else varyHeader'
   let varyHeader''' = if isJust cp      then "Accept-Charset":varyHeader'' else varyHeader''
-  setHeader "Vary" . TL.intercalate ", " $ varyHeader'''
+  unless (null varyHeader''') $ setHeader "Vary" . TL.intercalate ", " $ varyHeader'''
   checkResourceExists config
 
 checkResourceExists :: (MonadIO m) => Config m -> RestM m ()
