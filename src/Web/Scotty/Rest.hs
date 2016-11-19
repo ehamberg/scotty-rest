@@ -173,7 +173,7 @@ restHandlerStart config = do
 setAllowHeader :: (MonadIO m) => Config m -> RestM m ()
 setAllowHeader config= do
   allowed <- allowedMethods config
-  setHeader "allow" . TL.intercalate ", " . map (convertString . show) $ allowed
+  setHeader "Allow" . TL.intercalate ", " . map (convertString . show) $ allowed
 
 ----------------------------------------------------------------------------------------------------
 -- OPTIONS
@@ -228,7 +228,7 @@ contentNegotiationVariances config = do
   let varyHeader'   = if length ctp > 1 then "Accept":varyHeader           else varyHeader
   let varyHeader''  = if isJust lp      then "Accept-Language":varyHeader' else varyHeader'
   let varyHeader''' = if isJust cp      then "Accept-Charset":varyHeader'' else varyHeader''
-  setHeader "vary" . TL.intercalate ", " $ varyHeader'''
+  setHeader "Vary" . TL.intercalate ", " $ varyHeader'''
   checkResourceExists config
 
 checkResourceExists :: (MonadIO m) => Config m -> RestM m ()
@@ -259,7 +259,7 @@ handleGetHeadExisting config = do
     MultipleRepresentations t' c' -> do writeContent t' c'
                                         status multipleChoices300
     MultipleWithPreferred t' c' u -> do writeContent t' c'
-                                        setHeader "location" u
+                                        setHeader "Location" u
                                         status multipleChoices300
     UniqueRepresentation          -> do when (method == GET) handler
                                         setContentTypeHeader contentType
@@ -271,8 +271,8 @@ handleGetHeadNonExisting = handleNonExisting
 checkMoved :: (MonadIO m) => Config m -> RestM m ()
 checkMoved config = resourceMoved config >>= \case
   NotMoved               -> return ()
-  (MovedPermanently url) -> setHeader "location" url >> raise MovedPermanently301
-  (MovedTemporarily url) -> setHeader "location" url >> raise MovedTemporarily307
+  (MovedPermanently url) -> setHeader "Location" url >> raise MovedPermanently301
+  (MovedTemporarily url) -> setHeader "Location" url >> raise MovedTemporarily307
 
 ----------------------------------------------------------------------------------------------------
 -- PUT/POST/PATCH
@@ -328,7 +328,7 @@ handlePutPostPatchExisting config = do
 acceptResource :: (MonadIO m) => Config m -> RestM m ()
 acceptResource config = do
   -- Is there a Content-Type header?
-  contentTypeHeader <- header "content-type"
+  contentTypeHeader <- header "Content-Type"
   contentType <- maybe (raise UnsupportedMediaType415) (return . convertString) contentTypeHeader
 
   -- Do we have a handler for this content type? If so, run it. Alternatively, return 415.
@@ -346,7 +346,7 @@ acceptResource config = do
        (SucceededWithLocation url, True)  -> locationAndResponseCode url noContent204
        (SucceededWithLocation url, False) -> locationAndResponseCode url created201
        (Redirect url, _)                  -> locationAndResponseCode url seeOther303
-    where locationAndResponseCode url response = setHeader "location" url >> status response
+    where locationAndResponseCode url response = setHeader "Location" url >> status response
 
 writeContent :: (MonadIO m) => MediaType -> TL.Text -> RestM m ()
 writeContent t c = do
@@ -362,7 +362,7 @@ resourceWithContent config t c = multipleChoices config >>= \case
   MultipleRepresentations t' c' -> do writeContent t' c'
                                       status multipleChoices300
   MultipleWithPreferred t' c' u -> do writeContent t' c'
-                                      setHeader "location" u
+                                      setHeader "Location" u
                                       status multipleChoices300
 
 ----------------------------------------------------------------------------------------------------
@@ -436,18 +436,18 @@ notModified config = do
 addEtagHeader :: (MonadIO m) => Config m -> RestM m ()
 addEtagHeader config = generateEtag config >>= \case
     Nothing         -> return ()
-    Just (Weak t)   -> setHeader "etag" ("W/\"" <> t <> "\"")
-    Just (Strong t) -> setHeader "etag" ("\"" <> t <> "\"")
+    Just (Weak t)   -> setHeader "Etag" ("W/\"" <> t <> "\"")
+    Just (Strong t) -> setHeader "Etag" ("\"" <> t <> "\"")
 
 addLastModifiedHeader :: (MonadIO m) => Config m -> RestM m ()
 addLastModifiedHeader config = lastModified config >>= \case
     Nothing -> return ()
-    Just t  -> setHeader "last-modified" (toHttpDateHeader t)
+    Just t  -> setHeader "Last-Modified" (toHttpDateHeader t)
 
 addExpiresHeader :: (MonadIO m) => Config m -> RestM m ()
 addExpiresHeader config = expires config >>= \case
     Nothing  -> return ()
-    Just t   -> setHeader "expires" (toHttpDateHeader t)
+    Just t   -> setHeader "Expires" (toHttpDateHeader t)
 
 modifiedSinceHeaderDate :: (MonadIO m) => Config m -> TL.Text -> RestM m (Maybe Bool)
 modifiedSinceHeaderDate config hdr = runMaybeT $ do
@@ -470,7 +470,7 @@ handleNonExisting config = do
   raise Gone410
 
 setContentTypeHeader :: (MonadIO m) => MediaType -> RestM m ()
-setContentTypeHeader = setHeader "content-type" . convertString . renderHeader
+setContentTypeHeader = setHeader "Content-Type" . convertString . renderHeader
 
 ifMethodIs :: (MonadIO m) => [StdMethod] -> RestM m () -> RestM m () -> RestM m ()
 ifMethodIs ms onTrue onFalse = do
