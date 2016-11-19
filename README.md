@@ -87,9 +87,9 @@ Transfer-Encoding: chunked
 Allow: GET, HEAD, OPTIONS
 ```
 
-Flow Chart
-----------
+# Flow diagrams
 
+The diagrams below show the flow of how `scotty-rest` will handle a request and the functions that are called at each decision point.
 
 
                             Start
