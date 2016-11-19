@@ -113,7 +113,8 @@ data RestConfig m = RestConfig
   -- Default: @[]@
   , contentTypesProvided :: m [(MediaType, m ())]
   -- ^ A list of the content types /provided/, together with handlers producing a response body for
-  -- that 'MediaType'.
+  -- that 'MediaType'. The first one that matches the `Accept` header passed by the client will be
+  -- chosen, which could make a difference e.g. with `Accept: */*` or `Accept: audio/*`.
   --
   -- Default: @[]@
   , languagesProvided    :: m (Maybe [Language])
