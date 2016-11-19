@@ -25,6 +25,7 @@ module Web.Scotty.Rest
   , UTCTime
   -- * Utilities
   , toHttpDateHeader
+  , requestMethod
   ) where
 
 import BasePrelude hiding (Handler)
@@ -123,14 +124,10 @@ findPreferred config headerName parse provided match = do
   where head' [] = Nothing
         head' (x:_) = Just x
 
-requestMethod :: (MonadIO m) => RestM m StdMethod
-requestMethod = do
-  req <- request
-  case (parseMethod . Wai.requestMethod) req of
-       Left  _       -> raise NotImplemented501
-       Right method  -> if method `elem` [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]
-                           then return method
-                           else raise NotImplemented501
+checkRequestMethod :: (MonadIO m) => RestM m ()
+checkRequestMethod = do
+  method <- requestMethod
+  unless (method `elem` [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]) (raise NotImplemented501)
 
 restHandlerStart :: (MonadIO m) => Config m -> RestM m ()
 restHandlerStart config = do
@@ -139,6 +136,8 @@ restHandlerStart config = do
   unless available (raise ServiceUnavailable503)
 
   -- Is the method known?
+  checkRequestMethod
+
   method <- requestMethod
 
   -- TODO: Is the URI too long?
@@ -516,6 +515,15 @@ parseHeaderDate hdr = do
 -- | Formats a 'UTCTime' as a HTTP date, e.g. /Sun, 06 Nov 1994 08:49:37 GMT/.
 toHttpDateHeader :: UTCTime -> TL.Text
 toHttpDateHeader = cs . formatHTTPDate . epochTimeToHTTPDate . convert
+
+-- | Returns the method used for the current request, e.g. /POST/.
+requestMethod :: (MonadIO m) => RestM m StdMethod
+requestMethod = do
+  req <- request
+  case (parseMethod . Wai.requestMethod) req of
+    Right method -> return method
+    Left method  -> raise (InternalServerError ("Parsing method " <> cs method <> " failed"))
+
 
 handleExcept :: (Monad m) => RestException -> RestM m ()
 handleExcept MovedPermanently301     = status movedPermanently301
