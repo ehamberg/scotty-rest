@@ -19,6 +19,72 @@ main = scottyT 3000 id $ do
   rest "/" defaultConfig {
     contentTypesProvided = return [("text/html", html "Hello, World!")]
   }
+
+```
+
+# Introduction
+
+This library implements server-side HTTP semantics as illustrated by the [Webmachine diagram](https://github.com/webmachine/webmachine/wiki/Diagram). Instead of simply having handlers for endpoints that then have to take full responsibility for handling all the behaviour expected from an HTTP server (using the correct return code, including the correct headers that go with some return codes, etc.), you implement the “decision nodes” and get correct semantics “for free”. These decision nodes are regular functions and they all have default implementations that do what you expect.
+
+Some examples of “decision functions” and their default implementations:
+
+- `serviceAvailable`: `return True`
+- `isAuthorized`: `return Authorized`
+- `charSetsProvided`: `Nothing` (i.e. ignore `Accept-Charsets` header) 
+- `allowedMethods`: `[GET, HEAD, OPTIONS]`
+- `resourceMoved`: `NotMoved`
+
+# Usage
+
+The two functions that you almost always is going to define yourself is `contentTypesProvided` and/or `contentTypesAccepted`. These are both a list of pairs of content types (e.g. `application/json`) together with a *handler* for that type. A *handler* is a function that is responsible for producing a response for its associated content type (in the case of `contentTypesProvided`) or consuming a value of its associated content type (in the case of `contentTypesAccepted`).
+
+In the example above, the only function overridden is `contentTypesProvided`. Our implementations says that we provide only one content type (`text/html`) and if someone asks for `text/html` (or `*/*`) we will use `Scotty's` `html` function to return the text "Hello World".
+
+Some example interactions with this server:
+
+```
+GET / HTTP/1.1
+Accept: */*
+Host: localhost:3000
+
+HTTP/1.1 200 OK
+Date: Sat, 19 Nov 2016 14:32:20 GMT
+Server: Warp/3.2.9
+Transfer-Encoding: chunked
+Content-Type: text/html
+
+Hello, World!
+```
+
+
+```
+GET / HTTP/1.1
+Accept: application/json
+Host: localhost:3000
+
+
+HTTP/1.1 406 Not Acceptable
+Date: Sat, 19 Nov 2016 14:32:30 GMT
+Server: Warp/3.2.9
+Transfer-Encoding: chunked
+```
+
+```
+POST / HTTP/1.1
+Accept: application/json, */*
+Content-Length: 13
+Content-Type: application/json
+Host: localhost:3000
+
+{
+    "test": "1"
+}
+
+HTTP/1.1 405 Method Not Allowed
+Date: Sat, 19 Nov 2016 14:32:57 GMT
+Server: Warp/3.2.9
+Transfer-Encoding: chunked
+Allow: GET, HEAD, OPTIONS
 ```
 
 Flow Chart
