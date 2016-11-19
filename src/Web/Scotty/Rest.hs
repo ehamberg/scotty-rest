@@ -36,7 +36,7 @@ import           Control.Monad.IO.Class    (MonadIO)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Data.Convertible          (convert)
 import           Data.Default.Class        (Default (..), def)
-import           Data.String.Conversions   (convertString)
+import           Data.String.Conversions   (cs)
 import qualified Data.Text.Lazy            as TL
 import           Data.Time.Calendar        (fromGregorian)
 import           Data.Time.Clock           (UTCTime (..), secondsToDiffTime)
@@ -76,7 +76,7 @@ preferred config = do
   -- find and store the best handler together with the content type. If we
   -- cannot provide that type, stop processing here and return a
   -- NotAcceptable406:
-  accept <- (convertString . fromMaybe "*/*") <$> header "accept"
+  accept <- (cs . fromMaybe "*/*") <$> header "accept"
   provided <- contentTypesProvided config
   contentType <- maybe (raise NotAcceptable406) return (matchAccept (map fst provided) accept)
   bestHandler <- maybe (raise NotAcceptable406) return (mapAccept provided accept)
@@ -85,7 +85,7 @@ preferred config = do
 
 language :: (MonadIO m) => Config m -> RestM m (Maybe Language)
 language config = findPreferred config "accept-language" parse languagesProvided match
-  where parse = parseAccept . convertString
+  where parse = parseAccept . cs
         match = flip matches
 
 charset :: (MonadIO m) => Config m -> RestM m (Maybe TL.Text)
@@ -173,7 +173,7 @@ restHandlerStart config = do
 setAllowHeader :: (MonadIO m) => Config m -> RestM m ()
 setAllowHeader config= do
   allowed <- allowedMethods config
-  setHeader "Allow" . TL.intercalate ", " . map (convertString . show) $ allowed
+  setHeader "Allow" . TL.intercalate ", " . map cs $ allowed
 
 ----------------------------------------------------------------------------------------------------
 -- OPTIONS
@@ -329,7 +329,7 @@ acceptResource :: (MonadIO m) => Config m -> RestM m ()
 acceptResource config = do
   -- Is there a Content-Type header?
   contentTypeHeader <- header "Content-Type"
-  contentType <- maybe (raise UnsupportedMediaType415) (return . convertString) contentTypeHeader
+  contentType <- maybe (raise UnsupportedMediaType415) (return . cs) contentTypeHeader
 
   -- Do we have a handler for this content type? If so, run it. Alternatively, return 415.
   handlers <- contentTypesAccepted config
@@ -352,12 +352,12 @@ writeContent :: (MonadIO m) => MediaType -> TL.Text -> RestM m ()
 writeContent t c = do
   method <- requestMethod
   setContentTypeHeader t
-  when (method /= HEAD) ((raw . convertString) c)
+  when (method /= HEAD) ((raw . cs) c)
 
 resourceWithContent :: (MonadIO m) => Config m -> MediaType -> TL.Text -> RestM m ()
 resourceWithContent config t c = multipleChoices config >>= \case
   UniqueRepresentation          -> do setContentTypeHeader t
-                                      (raw . convertString) c
+                                      (raw . cs) c
                                       status ok200
   MultipleRepresentations t' c' -> do writeContent t' c'
                                       status multipleChoices300
@@ -470,7 +470,7 @@ handleNonExisting config = do
   raise Gone410
 
 setContentTypeHeader :: (MonadIO m) => MediaType -> RestM m ()
-setContentTypeHeader = setHeader "Content-Type" . convertString . renderHeader
+setContentTypeHeader = setHeader "Content-Type" . cs . renderHeader
 
 ifMethodIs :: (MonadIO m) => [StdMethod] -> RestM m () -> RestM m () -> RestM m ()
 ifMethodIs ms onTrue onFalse = do
@@ -502,7 +502,7 @@ ifEtagMatches config given onTrue onFalse = do
 
 parseHeaderDate :: TL.Text -> Maybe UTCTime
 parseHeaderDate hdr = do
-  headerDate <- (parseHTTPDate . convertString) hdr
+  headerDate <- (parseHTTPDate . cs) hdr
   let year = (fromIntegral . hdYear) headerDate
       mon  = hdMonth headerDate
       day  = hdDay headerDate
@@ -515,7 +515,7 @@ parseHeaderDate hdr = do
 
 -- | Formats a 'UTCTime' as a HTTP date, e.g. /Sun, 06 Nov 1994 08:49:37 GMT/.
 toHttpDateHeader :: UTCTime -> TL.Text
-toHttpDateHeader = convertString . formatHTTPDate . epochTimeToHTTPDate . convert
+toHttpDateHeader = cs . formatHTTPDate . epochTimeToHTTPDate . convert
 
 handleExcept :: (Monad m) => RestException -> RestM m ()
 handleExcept MovedPermanently301     = status movedPermanently301
