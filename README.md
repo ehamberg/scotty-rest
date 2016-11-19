@@ -42,11 +42,15 @@ In the example above, the only function overridden is `contentTypesProvided`. Ou
 
 Some example interactions with this server:
 
+## Requesting any content type
+
 ```
 GET / HTTP/1.1
 Accept: */*
 Host: localhost:3000
+```
 
+```
 HTTP/1.1 200 OK
 Date: Sat, 19 Nov 2016 14:32:20 GMT
 Server: Warp/3.2.9
@@ -56,18 +60,22 @@ Content-Type: text/html
 Hello, World!
 ```
 
+## Requesting a content type that isn't provided
 
 ```
 GET / HTTP/1.1
 Accept: application/json
 Host: localhost:3000
+```
 
-
+```
 HTTP/1.1 406 Not Acceptable
 Date: Sat, 19 Nov 2016 14:32:30 GMT
 Server: Warp/3.2.9
 Transfer-Encoding: chunked
 ```
+
+# `POST`ing a JSON document
 
 ```
 POST / HTTP/1.1
@@ -79,7 +87,9 @@ Host: localhost:3000
 {
     "test": "1"
 }
+```
 
+```
 HTTP/1.1 405 Method Not Allowed
 Date: Sat, 19 Nov 2016 14:32:57 GMT
 Server: Warp/3.2.9
