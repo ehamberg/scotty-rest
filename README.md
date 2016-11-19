@@ -418,9 +418,9 @@ The diagrams below show the flow of how `scotty-rest` will handle a request and 
     │                      │                                                      │                 │
     │                      ▼                                                      ▼                 │
     │     ╔════════════════════════════════╗                        ┌───────────────────────────┐   │
-    │     ║Run the found callback function ║    Failed              │415 Unsupported Media Type │   │
-    │     ║    in contentTypesAccepted     ║────────────┐           └───────────────────────────┘   │
-    │     ║                                ║            │                                           │
+    │     ║ Run the callback function from ║    Failed              │415 Unsupported Media Type │   │
+    │     ║  contentTypesAccepted for the  ║────────────┐           └───────────────────────────┘   │
+    │     ║   content type we were given   ║            │                                           │
     │     ╚═══════╦════════════════╦════╦══╝            │                                           │
     │             │        │       │    │               │                                           │
     │             │        │       │    │               │            ┌───────────────────────────┐  │
