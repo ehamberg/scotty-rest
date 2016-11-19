@@ -172,7 +172,7 @@ restHandlerStart config = do
 setAllowHeader :: (MonadIO m) => Config m -> RestM m ()
 setAllowHeader config= do
   allowed <- allowedMethods config
-  setHeader "Allow" . TL.intercalate ", " . map cs $ allowed
+  setHeader "Allow" . TL.intercalate ", " . map (cs . show) $ allowed
 
 ----------------------------------------------------------------------------------------------------
 -- OPTIONS
