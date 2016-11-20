@@ -97,6 +97,11 @@ Transfer-Encoding: chunked
 Allow: GET, HEAD, OPTIONS
 ```
 
+# State
+
+You will often want to have some state per request. You could for example imagine having a `serviceAvailable` function that attempts to get a database connection from a connections pool and if successful it would add the acquired connection handle to the current state. The `isAuthorized` call could then use this connection to authenticate/authorize a user based on a token and then add the user record to the current state, and so on.
+
+
 # Flow diagrams
 
 The diagrams below show the flow of how `scotty-rest` will handle a request and the functions that are called at each decision point.
