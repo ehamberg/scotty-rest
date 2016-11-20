@@ -75,7 +75,7 @@ Server: Warp/3.2.9
 Transfer-Encoding: chunked
 ```
 
-# `POST`ing a JSON document
+## `POST`ing a JSON document
 
 ```
 POST / HTTP/1.1
