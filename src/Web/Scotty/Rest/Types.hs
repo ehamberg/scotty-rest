@@ -188,7 +188,7 @@ data RestConfig m = RestConfig
   -- Default: @[]@
   }
 
-instance (MonadIO m) => Default (RestConfig m) where
+instance (Monad m) => Default (RestConfig m) where
  def = RestConfig { allowedMethods       = return [GET, HEAD, OPTIONS]
                   , resourceExists       = return True
                   , previouslyExisted    = return False
