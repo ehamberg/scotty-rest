@@ -36,7 +36,6 @@ import           Control.Monad             (void)
 import           Control.Monad.IO.Class    (MonadIO)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Data.Convertible          (convert)
-import           Data.Default.Class        (Default (..), def)
 import           Data.String.Conversions   (cs)
 import qualified Data.Text.Lazy            as TL
 import           Data.Time.Calendar        (fromGregorian)
@@ -69,7 +68,30 @@ rest pattern config = matchAny pattern (restHandlerStart config `rescue` handleE
 -- >   contentTypesProvided = return [("text/html", html "Hello, World!")]
 -- > }
 defaultConfig :: (Monad m) => Config m
-defaultConfig = def
+defaultConfig = RestConfig {
+                    allowedMethods       = return [GET, HEAD, OPTIONS]
+                  , resourceExists       = return True
+                  , previouslyExisted    = return False
+                  , isConflict           = return False
+                  , contentTypesAccepted = return []
+                  , contentTypesProvided = return []
+                  , languagesProvided    = return Nothing
+                  , charsetsProvided     = return Nothing
+                  , deleteResource       = return NotDeleted
+                  , optionsHandler       = return Nothing
+                  , generateEtag         = return Nothing
+                  , expires              = return Nothing
+                  , lastModified         = return Nothing
+                  , malformedRequest     = return False
+                  , isAuthorized         = return Authorized
+                  , forbidden            = return False
+                  , serviceAvailable     = return True
+                  , allowMissingPost     = return True
+                  , multipleChoices      = return UniqueRepresentation
+                  , resourceMoved        = return NotMoved
+                  , variances            = return []
+                  }
+
 
 preferred :: (Monad m) => Config m -> RestM m (MediaType, RestM m ())
 preferred config = do

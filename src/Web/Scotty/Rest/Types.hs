@@ -23,7 +23,6 @@ module Web.Scotty.Rest.Types
 
 import BasePrelude
 
-import           Data.Default.Class     (Default (..), def)
 import qualified Data.Text.Lazy         as TL
 import           Data.Time.Clock        (UTCTime)
 import           Network.HTTP.Media     (Language, MediaType)
@@ -186,30 +185,6 @@ data RestConfig m = RestConfig
   --
   -- Default: @[]@
   }
-
-instance (Monad m) => Default (RestConfig m) where
- def = RestConfig { allowedMethods       = return [GET, HEAD, OPTIONS]
-                  , resourceExists       = return True
-                  , previouslyExisted    = return False
-                  , isConflict           = return False
-                  , contentTypesAccepted = return []
-                  , contentTypesProvided = return []
-                  , languagesProvided    = return Nothing
-                  , charsetsProvided     = return Nothing
-                  , deleteResource       = return NotDeleted
-                  , optionsHandler       = return Nothing
-                  , generateEtag         = return Nothing
-                  , expires              = return Nothing
-                  , lastModified         = return Nothing
-                  , malformedRequest     = return False
-                  , isAuthorized         = return Authorized
-                  , forbidden            = return False
-                  , serviceAvailable     = return True
-                  , allowMissingPost     = return True
-                  , multipleChoices      = return UniqueRepresentation
-                  , resourceMoved        = return NotMoved
-                  , variances            = return []
-                  }
 
 data RestException = MovedPermanently301
                    | NotModified304
