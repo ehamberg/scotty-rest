@@ -9,7 +9,7 @@ import Test.Hspec.Wai
 import Test.Hspec.Wai.Internal
 import Test.QuickCheck         (Arbitrary, arbitrary, elements, property)
 
-import           Web.Scotty.Rest  (RestConfig (..), StdMethod (..))
+import           Web.Scotty.Rest  (EndpointConfig(..), StdMethod (..))
 import qualified Web.Scotty.Rest  as Rest
 import           Web.Scotty.Trans hiding (delete, get, patch, post, put, request)
 

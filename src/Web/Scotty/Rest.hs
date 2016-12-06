@@ -5,8 +5,10 @@
 
 module Web.Scotty.Rest
   (
+  -- * REST monad transformer
+    RestT
   -- * REST handler to Scotty
-    rest
+  , rest
   -- * Callback result types
   , Authorized(..)
   , DeleteResult(..)
@@ -15,7 +17,7 @@ module Web.Scotty.Rest
   , ProcessingResult(..)
   , Representation(..)
   -- * Config
-  , RestConfig(..)
+  , EndpointConfig(..)
   , defaultConfig
   -- * Rest Exceptions
   , RestException(..)
@@ -48,7 +50,7 @@ import           Network.HTTP.Types.Status
 import qualified Network.Wai               as Wai
 import           Web.Scotty.Trans
 
-type Config m = RestConfig (RestM m)
+type Config m = EndpointConfig (RestT m)
 
 -- | /rest/ is used where you would use e.g. 'get' in your Scotty app, and
 -- will match any method:
@@ -68,7 +70,7 @@ rest pattern config = matchAny pattern (restHandlerStart config `rescue` handleE
 -- >   contentTypesProvided = return [("text/html", html "Hello, World!")]
 -- > }
 defaultConfig :: (Monad m) => Config m
-defaultConfig = RestConfig {
+defaultConfig = EndpointConfig {
                     allowedMethods       = return [GET, HEAD, OPTIONS]
                   , resourceExists       = return True
                   , previouslyExisted    = return False
@@ -93,7 +95,7 @@ defaultConfig = RestConfig {
                   }
 
 
-preferred :: (Monad m) => Config m -> RestM m (MediaType, RestM m ())
+preferred :: (Monad m) => Config m -> RestT m (MediaType, RestT m ())
 preferred config = do
   -- If there is an `Accept` header – look at the content types we provide and
   -- find and store the best handler together with the content type. If we
@@ -106,12 +108,12 @@ preferred config = do
 
   return (contentType, bestHandler)
 
-language :: (Monad m) => Config m -> RestM m (Maybe Language)
+language :: (Monad m) => Config m -> RestT m (Maybe Language)
 language config = findPreferred config "accept-language" parse languagesProvided match
   where parse = parseAccept . cs
         match = flip matches
 
-charset :: (Monad m) => Config m -> RestM m (Maybe TL.Text)
+charset :: (Monad m) => Config m -> RestT m (Maybe TL.Text)
 charset config = findPreferred config "accept-charset" parse charsetsProvided match
   where parse     = Just
         match a b = TL.toCaseFold a == TL.toCaseFold b
@@ -119,9 +121,9 @@ charset config = findPreferred config "accept-charset" parse charsetsProvided ma
 findPreferred :: (Monad m) => Config m
               -> TL.Text
               -> (TL.Text -> Maybe a)
-              -> (Config m -> RestM m (Maybe [a]))
+              -> (Config m -> RestT m (Maybe [a]))
               -> (a -> a -> Bool)
-              -> RestM m (Maybe a)
+              -> RestT m (Maybe a)
 findPreferred config headerName parse provided match = do
   -- If there is an `Accept-{Charsets,Languages}` header and
   -- `{Charsets,Languages}Provided` is defined, look at what we provide and
@@ -146,12 +148,12 @@ findPreferred config headerName parse provided match = do
   where head' [] = Nothing
         head' (x:_) = Just x
 
-checkRequestMethod :: (Monad m) => RestM m ()
+checkRequestMethod :: (Monad m) => RestT m ()
 checkRequestMethod = do
   method <- requestMethod
   unless (method `elem` [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS]) (raise NotImplemented501)
 
-restHandlerStart :: (Monad m) => Config m -> RestM m ()
+restHandlerStart :: (Monad m) => Config m -> RestT m ()
 restHandlerStart config = do
   -- Is our service available?
   available <- serviceAvailable config
@@ -191,7 +193,7 @@ restHandlerStart config = do
      then handleOptions config
      else contentNegotiationStart config
 
-setAllowHeader :: (Monad m) => Config m -> RestM m ()
+setAllowHeader :: (Monad m) => Config m -> RestT m ()
 setAllowHeader config= do
   allowed <- allowedMethods config
   setHeader "Allow" . TL.intercalate ", " . map (cs . show) $ allowed
@@ -200,7 +202,7 @@ setAllowHeader config= do
 -- OPTIONS
 ----------------------------------------------------------------------------------------------------
 
-handleOptions :: (Monad m) => Config m -> RestM m ()
+handleOptions :: (Monad m) => Config m -> RestT m ()
 handleOptions config = optionsHandler config >>= \case
   Nothing                       -> setAllowHeader config
   (Just (contentType, handler)) -> handler >> setContentTypeHeader contentType
@@ -209,10 +211,10 @@ handleOptions config = optionsHandler config >>= \case
 -- Content negotiation
 ----------------------------------------------------------------------------------------------------
 
-contentNegotiationStart :: (Monad m) => Config m -> RestM m ()
+contentNegotiationStart :: (Monad m) => Config m -> RestT m ()
 contentNegotiationStart = contentNegotiationAccept
 
-contentNegotiationAccept :: (Monad m) => Config m -> RestM m ()
+contentNegotiationAccept :: (Monad m) => Config m -> RestT m ()
 contentNegotiationAccept config = do
   accept <- header "accept"
   -- evalute `preferred` to force early 406 (Not acceptable):
@@ -221,7 +223,7 @@ contentNegotiationAccept config = do
 
 -- If there is an `Accept-Language` header, check that we provide that
 -- language. If not → 406.
-contentNegotiationAcceptLanguage :: (Monad m) => Config m -> RestM m ()
+contentNegotiationAcceptLanguage :: (Monad m) => Config m -> RestT m ()
 contentNegotiationAcceptLanguage config = do
   acceptLanguage <- header "accept-language"
   -- evalute `language` to force early 406 (Not acceptable):
@@ -230,7 +232,7 @@ contentNegotiationAcceptLanguage config = do
 
 -- -- If there is an `Accept-Charset` header, check that we provide that
 -- -- char set. If not → 406.
-contentNegotiationAcceptCharSet :: (Monad m) => Config m -> RestM m ()
+contentNegotiationAcceptCharSet :: (Monad m) => Config m -> RestT m ()
 contentNegotiationAcceptCharSet config = do
   acceptCharset <- header "accept-charset"
   -- evalute `charset` to force early 406 (Not acceptable):
@@ -240,7 +242,7 @@ contentNegotiationAcceptCharSet config = do
 -- If we provide more than one content type, add `Accept` to `Vary` header. If
 -- we provide a set of languages and/or charsets, add `Accept-Language` and
 -- `Accept-Charset`, respectively, to the `Vary` header too.
-contentNegotiationVariances :: (Monad m) => Config m -> RestM m ()
+contentNegotiationVariances :: (Monad m) => Config m -> RestT m ()
 contentNegotiationVariances config = do
   ctp <- contentTypesProvided config
   lp  <- languagesProvided config
@@ -252,7 +254,7 @@ contentNegotiationVariances config = do
   unless (null varyHeader''') $ setHeader "Vary" . TL.intercalate ", " $ varyHeader'''
   checkResourceExists config
 
-checkResourceExists :: (Monad m) => Config m -> RestM m ()
+checkResourceExists :: (Monad m) => Config m -> RestT m ()
 checkResourceExists config = do
   method <- requestMethod
   exists <- resourceExists config
@@ -270,7 +272,7 @@ checkResourceExists config = do
 -- GET/HEAD
 ----------------------------------------------------------------------------------------------------
 
-handleGetHeadExisting :: (Monad m) => Config m -> RestM m ()
+handleGetHeadExisting :: (Monad m) => Config m -> RestT m ()
 handleGetHeadExisting config = do
   cond config
   addCacheHeaders config
@@ -286,10 +288,10 @@ handleGetHeadExisting config = do
                                         setContentTypeHeader contentType
                                         status ok200
 
-handleGetHeadNonExisting :: (Monad m) => Config m -> RestM m ()
+handleGetHeadNonExisting :: (Monad m) => Config m -> RestT m ()
 handleGetHeadNonExisting = handleNonExisting
 
-checkMoved :: (Monad m) => Config m -> RestM m ()
+checkMoved :: (Monad m) => Config m -> RestT m ()
 checkMoved config = resourceMoved config >>= \case
   NotMoved               -> return ()
   (MovedPermanently url) -> setHeader "Location" url >> raise MovedPermanently301
@@ -299,7 +301,7 @@ checkMoved config = resourceMoved config >>= \case
 -- PUT/POST/PATCH
 ----------------------------------------------------------------------------------------------------
 
-handlePutPostPatchNonExisting :: (Monad m) => Config m -> RestM m ()
+handlePutPostPatchNonExisting :: (Monad m) => Config m -> RestT m ()
 handlePutPostPatchNonExisting config = do
   -- If there is an if-match header, the precondition failed since the resource doesn't exist
   hasIfMatchHeader <- isJust <$> header "if-match"
@@ -308,27 +310,27 @@ handlePutPostPatchNonExisting config = do
     (ppppreviouslyExisted config)
     (pppmethodIsPut config)
 
-ppppreviouslyExisted :: (Monad m) => Config m -> RestM m ()
+ppppreviouslyExisted :: (Monad m) => Config m -> RestT m ()
 ppppreviouslyExisted config = do
   existed <- previouslyExisted config
   if existed
      then pppmovedPermanentlyOrTemporarily config
      else pppmethodIsPost config
 
-pppmovedPermanentlyOrTemporarily :: (Monad m) => Config m -> RestM m ()
+pppmovedPermanentlyOrTemporarily :: (Monad m) => Config m -> RestT m ()
 pppmovedPermanentlyOrTemporarily config = do
   checkMoved config
   ifMethodIs [POST]
     (allowsMissingPost config (acceptResource config) (raise Gone410))
     (pppmethodIsPut config)
 
-pppmethodIsPost :: (Monad m) => Config m -> RestM m ()
+pppmethodIsPost :: (Monad m) => Config m -> RestT m ()
 pppmethodIsPost config =
   ifMethodIs [POST]
     (allowsMissingPost config (pppmethodIsPut config) (raise NotFound404))
     (raise NotFound404)
 
-pppmethodIsPut :: (Monad m) => Config m -> RestM m ()
+pppmethodIsPut :: (Monad m) => Config m -> RestT m ()
 pppmethodIsPut config = do
   method <- requestMethod
   when (method == PUT || method == PATCH) $ do
@@ -337,7 +339,7 @@ pppmethodIsPut config = do
 
   acceptResource config
 
-handlePutPostPatchExisting :: (Monad m) => Config m -> RestM m ()
+handlePutPostPatchExisting :: (Monad m) => Config m -> RestT m ()
 handlePutPostPatchExisting config = do
   cond config
   pppmethodIsPut config
@@ -346,7 +348,7 @@ handlePutPostPatchExisting config = do
 -- POST/PUT/PATCH, part 2: content-types accepted
 ----------------------------------------------------------------------------------------------------
 
-acceptResource :: (Monad m) => Config m -> RestM m ()
+acceptResource :: (Monad m) => Config m -> RestT m ()
 acceptResource config = do
   -- Is there a Content-Type header?
   contentTypeHeader <- header "Content-Type"
@@ -369,13 +371,13 @@ acceptResource config = do
        (Redirect url, _)                  -> locationAndResponseCode url seeOther303
     where locationAndResponseCode url response = setHeader "Location" url >> status response
 
-writeContent :: (Monad m) => MediaType -> TL.Text -> RestM m ()
+writeContent :: (Monad m) => MediaType -> TL.Text -> RestT m ()
 writeContent t c = do
   method <- requestMethod
   setContentTypeHeader t
   when (method /= HEAD) ((raw . cs) c)
 
-resourceWithContent :: (Monad m) => Config m -> MediaType -> TL.Text -> RestM m ()
+resourceWithContent :: (Monad m) => Config m -> MediaType -> TL.Text -> RestT m ()
 resourceWithContent config t c = multipleChoices config >>= \case
   UniqueRepresentation          -> do setContentTypeHeader t
                                       (raw . cs) c
@@ -390,7 +392,7 @@ resourceWithContent config t c = multipleChoices config >>= \case
 -- DELETE
 ----------------------------------------------------------------------------------------------------
 
-handleDeleteExisting :: (Monad m) => Config m -> RestM m ()
+handleDeleteExisting :: (Monad m) => Config m -> RestT m ()
 handleDeleteExisting config = do
   cond config
   result <- deleteResource config
@@ -400,30 +402,30 @@ handleDeleteExisting config = do
        (DeletedWithResponse t c) -> resourceWithContent config t c
        NotDeleted                -> raise (InternalServerError "Deleting existing resource failed")
 
-handleDeleteNonExisting :: (Monad m) => Config m -> RestM m ()
+handleDeleteNonExisting :: (Monad m) => Config m -> RestT m ()
 handleDeleteNonExisting = handleNonExisting
 
 ----------------------------------------------------------------------------------------------------
 -- Conditional requests
 ----------------------------------------------------------------------------------------------------
 
-cond :: (Monad m) => Config m -> RestM m ()
+cond :: (Monad m) => Config m -> RestT m ()
 cond = condIfMatch
 
-condIfMatch :: (Monad m) => Config m -> RestM m ()
+condIfMatch :: (Monad m) => Config m -> RestT m ()
 condIfMatch config = header "if-match" >>= \case
   Nothing  -> condIfUnmodifiedSince config
   Just hdr -> ifEtagMatches config hdr
                 (condIfUnmodifiedSince config)
                 (addEtagHeader config >> raise PreconditionFailed412)
 
-condIfUnmodifiedSince :: (Monad m) => Config m -> RestM m ()
+condIfUnmodifiedSince :: (Monad m) => Config m -> RestT m ()
 condIfUnmodifiedSince config = modifiedSinceHeaderDate config "if-unmodified-since" >>= \case
        Nothing    -> condIfNoneMatch config -- If there are any errors: continue
        Just False -> condIfNoneMatch config
        Just True  -> addLastModifiedHeader config >> raise PreconditionFailed412
 
-condIfNoneMatch :: (Monad m) => Config m -> RestM m ()
+condIfNoneMatch :: (Monad m) => Config m -> RestT m ()
 condIfNoneMatch config = header "if-none-match" >>= \case
   Nothing  -> condIfModifiedSince config
   Just hdr -> ifEtagMatches config hdr
@@ -433,7 +435,7 @@ condIfNoneMatch config = header "if-none-match" >>= \case
                    (notModified config)
                    (addEtagHeader config >> raise PreconditionFailed412)
 
-condIfModifiedSince :: (Monad m) => Config m -> RestM m ()
+condIfModifiedSince :: (Monad m) => Config m -> RestT m ()
 condIfModifiedSince config = modifiedSinceHeaderDate config "if-modified-since" >>= \case
        Nothing    -> return ()
        Just False -> notModified config
@@ -443,41 +445,41 @@ condIfModifiedSince config = modifiedSinceHeaderDate config "if-modified-since" 
 -- Helpers
 ----------------------------------------------------------------------------------------------------
 
-addCacheHeaders :: (Monad m) => Config m -> RestM m ()
+addCacheHeaders :: (Monad m) => Config m -> RestT m ()
 addCacheHeaders config = do
   addEtagHeader config
   addLastModifiedHeader config
   addExpiresHeader config
 
-notModified :: (Monad m) => Config m -> RestM m ()
+notModified :: (Monad m) => Config m -> RestT m ()
 notModified config = do
   addCacheHeaders config
   raise NotModified304
 
-addEtagHeader :: (Monad m) => Config m -> RestM m ()
+addEtagHeader :: (Monad m) => Config m -> RestT m ()
 addEtagHeader config = generateEtag config >>= \case
     Nothing         -> return ()
     Just (Weak t)   -> setHeader "Etag" ("W/\"" <> t <> "\"")
     Just (Strong t) -> setHeader "Etag" ("\"" <> t <> "\"")
 
-addLastModifiedHeader :: (Monad m) => Config m -> RestM m ()
+addLastModifiedHeader :: (Monad m) => Config m -> RestT m ()
 addLastModifiedHeader config = lastModified config >>= \case
     Nothing -> return ()
     Just t  -> setHeader "Last-Modified" (toHttpDateHeader t)
 
-addExpiresHeader :: (Monad m) => Config m -> RestM m ()
+addExpiresHeader :: (Monad m) => Config m -> RestT m ()
 addExpiresHeader config = expires config >>= \case
     Nothing  -> return ()
     Just t   -> setHeader "Expires" (toHttpDateHeader t)
 
-modifiedSinceHeaderDate :: (Monad m) => Config m -> TL.Text -> RestM m (Maybe Bool)
+modifiedSinceHeaderDate :: (Monad m) => Config m -> TL.Text -> RestT m (Maybe Bool)
 modifiedSinceHeaderDate config hdr = runMaybeT $ do
     modDate    <- MaybeT (lastModified config)
     headerText <- MaybeT (header hdr)
     headerDate <- MaybeT (return (parseHeaderDate headerText))
     return (modDate > headerDate)
 
-handleNonExisting :: (Monad m) => Config m -> RestM m ()
+handleNonExisting :: (Monad m) => Config m -> RestT m ()
 handleNonExisting config = do
   -- If there is an if-match header, the precondition failed since the resource doesn't exist
   hasIfMatchHeader <- isJust <$> header "if-match"
@@ -490,24 +492,24 @@ handleNonExisting config = do
   checkMoved config
   raise Gone410
 
-setContentTypeHeader :: (Monad m) => MediaType -> RestM m ()
+setContentTypeHeader :: (Monad m) => MediaType -> RestT m ()
 setContentTypeHeader = setHeader "Content-Type" . cs . renderHeader
 
-ifMethodIs :: (Monad m) => [StdMethod] -> RestM m () -> RestM m () -> RestM m ()
+ifMethodIs :: (Monad m) => [StdMethod] -> RestT m () -> RestT m () -> RestT m ()
 ifMethodIs ms onTrue onFalse = do
   method <- requestMethod
   if method `elem` ms
      then onTrue
      else onFalse
 
-allowsMissingPost :: (Monad m) => Config m -> RestM m () -> RestM m () -> RestM m ()
+allowsMissingPost :: (Monad m) => Config m -> RestT m () -> RestT m () -> RestT m ()
 allowsMissingPost config onTrue onFalse = do
   allowed <- allowMissingPost config
   if allowed
      then onTrue
      else onFalse
 
-ifEtagMatches :: (Monad m) => Config m -> TL.Text -> RestM m () -> RestM m () -> RestM m ()
+ifEtagMatches :: (Monad m) => Config m -> TL.Text -> RestT m () -> RestT m () -> RestT m ()
 ifEtagMatches _      "*"   onTrue _       = onTrue
 ifEtagMatches config given onTrue onFalse = do
   tag <- generateEtag config
@@ -539,7 +541,7 @@ toHttpDateHeader :: UTCTime -> TL.Text
 toHttpDateHeader = cs . formatHTTPDate . epochTimeToHTTPDate . convert
 
 -- | Returns the method used for the current request, e.g. /POST/.
-requestMethod :: (Monad m) => RestM m StdMethod
+requestMethod :: (Monad m) => RestT m StdMethod
 requestMethod = do
   req <- request
   case (parseMethod . Wai.requestMethod) req of
@@ -547,7 +549,7 @@ requestMethod = do
     Left method  -> raise (InternalServerError ("Parsing method " <> cs method <> " failed"))
 
 
-handleExcept :: (Monad m) => RestException -> RestM m ()
+handleExcept :: (Monad m) => RestException -> RestT m ()
 handleExcept MovedPermanently301     = status movedPermanently301
 handleExcept NotModified304          = status notModified304
 handleExcept MovedTemporarily307     = status temporaryRedirect307

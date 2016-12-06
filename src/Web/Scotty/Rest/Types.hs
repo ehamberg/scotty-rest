@@ -4,7 +4,7 @@
 
 module Web.Scotty.Rest.Types
   (
-    RestM
+    RestT
   -- * Callbacks result types
   , Authorized(..)
   , DeleteResult(..)
@@ -12,7 +12,7 @@ module Web.Scotty.Rest.Types
   , Moved(..)
   , ProcessingResult(..)
   , Representation (..)
-  , RestConfig(..)
+  , EndpointConfig(..)
   , RestException(..)
   , Url
   -- * Re-exports
@@ -29,7 +29,7 @@ import           Network.HTTP.Media     (Language, MediaType)
 import           Network.HTTP.Types     (StdMethod (..))
 import           Web.Scotty.Trans       hiding (get)
 
-type RestM m = ActionT RestException m
+type RestT m = ActionT RestException m
 
 -- | A URL.
 type Url = TL.Text
@@ -87,7 +87,7 @@ data Authorized = Authorized             -- ^ User is authenticated and authoriz
 
 -- | The callbacks that control a handler's behaviour.  'Scotty.Rest.defaultConfig' returns a config
 -- with default values. For typical handlers, you only need to override a few of these callbacks.
-data RestConfig m = RestConfig
+data EndpointConfig m = EndpointConfig
   { allowedMethods       :: m [StdMethod]
   -- ^ List of allowed methos.
   --
