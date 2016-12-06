@@ -23,7 +23,6 @@ module Web.Scotty.Rest.Types
 
 import BasePrelude
 
-import           Control.Monad.IO.Class (MonadIO)
 import           Data.Default.Class     (Default (..), def)
 import qualified Data.Text.Lazy         as TL
 import           Data.Time.Clock        (UTCTime)
