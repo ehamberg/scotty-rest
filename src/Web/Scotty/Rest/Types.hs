@@ -89,7 +89,7 @@ data Authorized = Authorized             -- ^ User is authenticated and authoriz
 -- with default values. For typical handlers, you only need to override a few of these callbacks.
 data EndpointConfig m = EndpointConfig
   { allowedMethods       :: m [StdMethod]
-  -- ^ List of allowed methos.
+  -- ^ List of allowed methods.
   --
   -- Default: @[GET, HEAD, OPTIONS]@
   , resourceExists       :: m Bool
