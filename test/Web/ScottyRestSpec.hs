@@ -562,6 +562,16 @@ spec = do
         it "makes sure we get a 415 when POSTing with invalid content-type" $
           request "POST" "/" [("Content-Type", "--")] "" `shouldRespondWith` "" {matchStatus = 415}
 
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [POST],
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [("text/plain", undefined)]
+        }) $
+        it "makes sure we get a 415 when POSTing with no content-type header" $ do
+          request "POST" "/" [] ""
+            `shouldRespondWith` 415
+
+
     describe "500 Internal Server Error" $
       withApp (Rest.rest "/" Rest.defaultConfig {serviceAvailable = raise $ stringError "XXX"}) $
         it "makes sure we get a 500 when throwing a string error" $
