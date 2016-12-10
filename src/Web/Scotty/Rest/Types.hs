@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes        #-}
 
 module Web.Scotty.Rest.Types
@@ -206,4 +207,5 @@ data RestException = MovedPermanently301
 
 instance ScottyError RestException where
   stringError = InternalServerError . TL.pack
-  showError = fromString . show
+  showError (InternalServerError message) = "Internal server error: " <> message
+  showError err = (fromString . show) err

@@ -584,7 +584,7 @@ spec = do
         }) $
         it "makes sure we can recover from a `raise`" $
           request "GET" "/" [] ""
-            `shouldRespondWith` "InternalServerError \"XXX\"" {matchStatus = 200}
+            `shouldRespondWith` "Internal server error: XXX" {matchStatus = 200}
 
   describe "Test servers" $
     describe "Echo server" $
