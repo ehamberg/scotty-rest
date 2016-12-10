@@ -348,6 +348,15 @@ spec = do
           request "GET" "/" [] "" `shouldRespondWith` "foo" {matchStatus = 200, matchHeaders = expectedHeaders}
 
   describe "HTTP (General)" $ do
+    describe "Authorized" $ do
+      withApp (Rest.rest "/" Rest.defaultConfig {
+          contentTypesProvided = return [("text/html", text "xxx")],
+          isAuthorized = return Rest.Authorized
+        }) $
+        it "makes sure we get a resource when we are authorized" $ do
+          request "GET" "/" [] ""
+            `shouldRespondWith` "xxx" {matchStatus = 200}
+
     describe "300: Multiple Representations" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
           contentTypesProvided = return [("text/html", text "xxx")],
