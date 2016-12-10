@@ -306,7 +306,7 @@ handlePutPostPatchNonExisting config = do
   -- If there is an if-match header, the precondition failed since the resource doesn't exist
   hasIfMatchHeader <- isJust <$> header "if-match"
   when hasIfMatchHeader (raise PreconditionFailed412)
-  ifMethodIs [POST, PATCH]
+  ifMethodIn [POST, PATCH]
     (ppppreviouslyExisted config)
     (pppmethodIsPut config)
 
@@ -320,13 +320,13 @@ ppppreviouslyExisted config = do
 pppmovedPermanentlyOrTemporarily :: (Monad m) => Config m -> RestT m ()
 pppmovedPermanentlyOrTemporarily config = do
   checkMoved config
-  ifMethodIs [POST]
+  ifMethodIn [POST]
     (allowsMissingPost config (acceptResource config) (raise Gone410))
     (pppmethodIsPut config)
 
 pppmethodIsPost :: (Monad m) => Config m -> RestT m ()
 pppmethodIsPost config =
-  ifMethodIs [POST]
+  ifMethodIn [POST]
     (allowsMissingPost config (pppmethodIsPut config) (raise NotFound404))
     (raise NotFound404)
 
@@ -431,7 +431,7 @@ condIfNoneMatch config = header "if-none-match" >>= \case
   Just hdr -> ifEtagMatches config hdr
                 match
                 (condIfModifiedSince config)
-    where match = ifMethodIs [GET, HEAD]
+    where match = ifMethodIn [GET, HEAD]
                    (notModified config)
                    (addEtagHeader config >> raise PreconditionFailed412)
 
@@ -495,8 +495,8 @@ handleNonExisting config = do
 setContentTypeHeader :: (Monad m) => MediaType -> RestT m ()
 setContentTypeHeader = setHeader "Content-Type" . cs . renderHeader
 
-ifMethodIs :: (Monad m) => [StdMethod] -> RestT m () -> RestT m () -> RestT m ()
-ifMethodIs ms onTrue onFalse = do
+ifMethodIn :: (Monad m) => [StdMethod] -> RestT m () -> RestT m () -> RestT m ()
+ifMethodIn ms onTrue onFalse = do
   method <- requestMethod
   if method `elem` ms
      then onTrue
