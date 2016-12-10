@@ -256,8 +256,8 @@ contentNegotiationVariances config = do
 
 checkResourceExists :: (Monad m) => Config m -> RestT m ()
 checkResourceExists config = do
-  method <- requestMethod
   exists <- resourceExists config
+  method <- requestMethod
   if | method `elem` [GET, HEAD]        -> if exists
                                               then handleGetHeadExisting config
                                               else handleGetHeadNonExisting config
