@@ -29,12 +29,20 @@ spec = do
   let withApp = with . scottyAppT id
 
   describe "Conditional requests" $ do
-    describe "If-Match" $
+    describe "If-Match" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
                 allowedMethods = return [DELETE]
               }) $
         it "makes sure we get a 412 Precondition Failed when e-tag does not match" $
           request "DELETE" "/" [("if-match", "")] "" `shouldRespondWith` 412
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                allowedMethods = return [POST],
+                resourceExists = return False
+              }) $
+        it "makes sure we get a 412 Precondition Failed for POST to non-existing" $ do
+          request "POST" "/" [("if-match", "\"foo\", \"bar\"")] ""
+            `shouldRespondWith` 412
 
     describe "If-None-Match" $ do
       withApp (Rest.rest "/" Rest.defaultConfig {
