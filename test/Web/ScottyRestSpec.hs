@@ -234,6 +234,18 @@ spec = do
             `shouldRespondWith` "" {matchStatus = 201, matchHeaders = expectedHeaders}
 
       withApp (Rest.rest "/" Rest.defaultConfig {
+          allowedMethods = return [PUT],
+          resourceExists = return False,
+          contentTypesProvided = return [("text/html", undefined)],
+          contentTypesAccepted = return [
+            ("text/plain", return Rest.Succeeded)
+          ]
+        }) $
+        it "makes sure we get a 201 on PUT to non-existing when handler returns Succeeded" $ do
+          request "PUT" "/" [("Content-Type", "text/plain")] ""
+            `shouldRespondWith` "" {matchStatus = 201}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
           allowedMethods = return [POST],
           resourceExists = return False,
           contentTypesProvided = return [("text/html", undefined)],
