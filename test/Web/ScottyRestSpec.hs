@@ -56,6 +56,15 @@ spec = do
 
       withApp (Rest.rest "/" Rest.defaultConfig {
                 allowedMethods = return [DELETE],
+                generateEtag = return (Just (Rest.Weak "foo"))
+              }) $
+        it "makes sure we get a 412 Precondition Failed for DELETE when weak e-tag matches" $ do
+          let expectedHeaders = ["Etag" <:> "W/\"foo\""]
+          request "DELETE" "/" [("if-none-match", "\"foo\"")] ""
+            `shouldRespondWith` 412 {matchHeaders = expectedHeaders}
+
+      withApp (Rest.rest "/" Rest.defaultConfig {
+                allowedMethods = return [DELETE],
                 generateEtag = return (Just (Rest.Strong "foo"))
               }) $
         it "makes sure we get a 412 Precondition Failed for DELETE when e-tag matches" $ do
