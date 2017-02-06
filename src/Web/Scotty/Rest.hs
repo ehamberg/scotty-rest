@@ -61,7 +61,7 @@ type Config m = EndpointConfig (RestT m)
 -- >       contentTypesProvided = return [("text/html", html "Hello, World!")]
 -- >     }
 rest :: (MonadIO m) => RoutePattern -> Config m -> ScottyT RestException m ()
-rest pattern config = matchAny pattern (restHandlerStart config `rescue` handleExcept)
+rest route config = matchAny route (restHandlerStart config `rescue` handleExcept)
 
 -- | A 'RestConfig' with default values. To override one or more fields, use
 -- record syntax:
