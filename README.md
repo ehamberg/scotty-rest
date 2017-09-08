@@ -4,7 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/ehamberg/scotty-rest/badge.svg?branch=master&service=github)](https://coveralls.io/github/ehamberg/scotty-rest?branch=master)
 
 A Webmachine-style library for [scotty](https://github.com/scotty-web/scotty)
-inspired by [cowboy](https://github.com/ninenines/cowboy)'s [cowboy_rest](http://ninenines.eu/docs/en/cowboy/HEAD/manual/cowboy_rest/) module.
+inspired by Erlang's [cowboy_rest](http://ninenines.eu/docs/en/cowboy/HEAD/manual/cowboy_rest/) module.
 
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
