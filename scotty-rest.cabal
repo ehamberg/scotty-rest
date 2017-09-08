@@ -1,5 +1,5 @@
 name:                scotty-rest
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis:            Webmachine-style REST library for scotty
 homepage:            http://github.com/ehamberg/scotty-rest
 license:             BSD3
